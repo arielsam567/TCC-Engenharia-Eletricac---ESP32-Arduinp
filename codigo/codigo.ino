@@ -558,6 +558,7 @@ void enviarStatusAutomatico() {
       case 3: nomeModo = "CICLICO_INICIO_LIGADO"; break;
       case 4: nomeModo = "CICLICO_INICIO_DESLIGADO"; break;
       case 5: nomeModo = "ESTRELA_TRIANGULO"; break;
+      case 6: nomeModo = "CONTROLE_MANUAL"; break;
     }
     debugPrint("📊 Status automático: Sistema em IDLE mas mostrando modo configurado: " + nomeModo);
   } else {
