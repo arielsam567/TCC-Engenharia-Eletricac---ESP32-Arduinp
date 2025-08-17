@@ -191,12 +191,13 @@ void processarComandosRecebidos() {
     char c = SerialBT.read();
     debugPrint("📱 CHAR RECEBIDO: '" + String(c) + "' (ASCII: " + String((int)c) + ")");
     
-    if (c == '\n' || c == '\r') {
-      // Comando completo recebido
-      if (comandoRecebido.length() > 0) {
-        debugPrint("📥 COMANDO RECEBIDO: '" + comandoRecebido + "'");
-        
-        if (comandoRecebido == "START") {
+    // Verificar se o comando termina com _END
+    if (comandoRecebido.endsWith("_END")) {
+      // Comando completo recebido - remover _END
+      comandoRecebido = comandoRecebido.substring(0, comandoRecebido.length() - 4);
+      debugPrint("📥 COMANDO RECEBIDO: '" + comandoRecebido + "'");
+      
+      if (comandoRecebido == "START") {
           // Comando para iniciar execução
           debugPrint("▶️  Comando START recebido");
           if (estadoAtual == IDLE) {
@@ -225,6 +226,7 @@ void processarComandosRecebidos() {
     } else {
       // Adicionar caractere ao comando
       comandoRecebido += c;
+      debugPrint("📝 COMANDO ACUMULADO: '" + comandoRecebido + "'");
     }
   }
 }

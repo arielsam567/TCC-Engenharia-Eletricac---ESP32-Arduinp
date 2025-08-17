@@ -28,23 +28,25 @@ Utiliza-se a biblioteca Bluetooth Serial nativa do núcleo Arduino-ESP32 (`Bluet
 
 #### Formato de comando
 
-O sistema recebe dois tipos de comandos em formato de string:
+O sistema recebe dois tipos de comandos em formato de string. **IMPORTANTE**: Todos os comandos devem terminar obrigatoriamente com `_END` para serem processados.
 
 **1. Comando de configuração:**
 ```
-"modo|tempo_1|tempo_2"
+"modo|tempo_1|tempo_2_END"
 ```
-(todos os campos em segundos, separados pelo caractere pipe "|").
+(todos os campos em segundos, separados pelo caractere pipe "|", terminando com `_END`).
 
 **2. Comando de entrada de sinal:**
 ```
-"START"
+"START_END"
 ```
 Este comando ativa a execução do modo de operação previamente configurado.
 
 **Exemplos**: 
-- "2|300|0" ⇒ modo = 2 (Cíclico ON), T_on=300 s, T_off=0 s
-- "START" ⇒ inicia a execução do modo configurado
+- "2|300|0_END" ⇒ modo = 2 (Cíclico ON), T_on=300 s, T_off=0 s
+- "START_END" ⇒ inicia a execução do modo configurado
+
+**Nota**: O sistema acumula caracteres até detectar o sufixo `_END`, remove esse sufixo e processa o comando. Isso permite envio de comandos sem necessidade de caracteres de controle como `\n` ou `\r`.
 
 **3. String de status automático:**
 ```
@@ -65,12 +67,22 @@ Define-se um único serviço Bluetooth Serial contendo uma característica de te
 
 1. **Configuração inicial**: O aplicativo conecta-se ao dispositivo e descobre a característica de comando.
 2. **Status automático**: Após 3 segundos de conexão Bluetooth estabelecida, o firmware envia automaticamente uma string com o status atual contendo o modo de operação configurado, tempos configurados e estado atual dos relés, permitindo sincronização inicial entre o app e o hardware.
-3. **Definição do modo**: O usuário envia a string de configuração; o firmware faz `split('|')`, converte para inteiros e atualiza a máquina de estados.
+3. **Definição do modo**: O usuário envia a string de configuração terminando com `_END`; o firmware acumula caracteres até detectar `_END`, remove esse sufixo, faz `split('|')`, converte para inteiros e atualiza a máquina de estados.
 4. **Persistência**: Os parâmetros são salvos na `EEPROM`.
-5. **Ativação**: O usuário envia o comando "START" para iniciar a execução do modo configurado.
+5. **Ativação**: O usuário envia o comando "START_END" para iniciar a execução do modo configurado.
 6. **Execução**: O firmware executa a sequência de temporização conforme o modo configurado.
 7. **Monitoramento**: Mudanças de estado geram notificações "ON"/"OFF" para atualização em tempo real na interface.
 8. **Notificação de alteração manual**: Quando conectado via Bluetooth Serial, ao alterar manualmente o estado de algum relé, o firmware envia automaticamente uma string informando o timestamp da alteração e o novo estado, permitindo sincronização em tempo real entre o app e o hardware.
+
+#### Processamento de comandos com _END
+
+O sistema implementa uma lógica robusta de processamento de comandos:
+
+- **Acumulação**: Caracteres são lidos individualmente e acumulados na variável `comandoRecebido`
+- **Detecção de fim**: O sistema verifica continuamente se o comando acumulado termina com `_END`
+- **Processamento**: Quando `_END` é detectado, o sufixo é removido e o comando é processado
+- **Debug**: Cada caractere recebido e o comando acumulado são exibidos para facilitar o debug
+- **Vantagens**: Não requer caracteres de controle especiais (`\n`, `\r`) e permite comandos de qualquer tamanho
 
 ### Implementação do firmware
 
@@ -131,14 +143,14 @@ O `BTProvider` gerencia:
 
 **Formato Geral:**
 ```
-"modo|tempo1|tempo2"
+"modo|tempo1|tempo2_END"
 ```
 
 **Exemplos Práticos:**
 
 - **Modo 1 - Retardo na energização (5 minutos):**
   ```
-  "1|300|0"
+  "1|300|0_END"
   ```
   - Modo: 1
   - Tempo1: 300 segundos (5 minutos)
@@ -146,7 +158,7 @@ O `BTProvider` gerencia:
 
 - **Modo 2 - Retardo na desenergização (2 minutos):**
   ```
-  "2|0|120"
+  "2|0|120_END"
   ```
   - Modo: 2
   - Tempo1: 0 (não usado neste modo)
@@ -154,7 +166,7 @@ O `BTProvider` gerencia:
 
 - **Modo 3 - Cíclico com início ligado (1 min ligado, 30s desligado):**
   ```
-  "3|60|30"
+  "3|60|30_END"
   ```
   - Modo: 3
   - Tempo1: 60 segundos (1 minuto ligado)
@@ -162,7 +174,7 @@ O `BTProvider` gerencia:
 
 - **Modo 4 - Cíclico com início desligado (30s desligado, 1 min ligado):**
   ```
-  "4|60|30"
+  "4|60|30_END"
   ```
   - Modo: 4
   - Tempo1: 60 segundos (1 minuto ligado)
@@ -170,7 +182,7 @@ O `BTProvider` gerencia:
 
 - **Modo 5 - Partida estrela-triângulo (10 segundos em estrela):**
   ```
-  "5|10|0"
+  "5|10|0_END"
   ```
   - Modo: 5
   - Tempo1: 10 segundos (tempo em estrela)
@@ -180,7 +192,7 @@ O `BTProvider` gerencia:
 
 **Para iniciar a execução após configurar o modo:**
 ```
-"START"
+"START_END"
 ```
 
 #### 3. Código de Exemplo em Flutter
@@ -192,7 +204,7 @@ class BluetoothService {
   // Enviar configuração de modo
   Future<void> configurarModo(int modo, int tempo1, int tempo2) async {
     if (connection?.isConnected == true) {
-      String comando = "$modo|$tempo1|$tempo2";
+      String comando = "$modo|$tempo1|$tempo2_END";
       print("📤 Enviando configuração: $comando");
       
       try {
@@ -208,7 +220,7 @@ class BluetoothService {
   // Iniciar execução do modo configurado
   Future<void> iniciarExecucao() async {
     if (connection?.isConnected == true) {
-      String comando = "START";
+      String comando = "START_END";
       print("📤 Enviando comando START");
       
       try {
@@ -260,37 +272,38 @@ class BluetoothService {
 #### 5. Validações Importantes
 
 - **Tempos máximos:** Até 20 dias (1.728.000 segundos)
-- **Formato:** Exatamente "modo|tempo1|tempo2" (sem espaços)
+- **Formato:** Exatamente "modo|tempo1|tempo2_END" (sem espaços, terminando obrigatoriamente com _END)
 - **Modos válidos:** 1, 2, 3, 4 ou 5
 - **Conexão:** Deve estar conectado antes de enviar comandos
-- **Sequência:** Configurar primeiro, depois enviar START
+- **Sequência:** Configurar primeiro, depois enviar START_END
+- **Terminação:** Todos os comandos DEVEM terminar com "_END" para serem processados
 
 ## Modos de Operação
 
 ### 1. Retardo na energização
-- **Formato**: "1|tempo|0"
+- **Formato**: "1|tempo|0_END"
 - **Comportamento**: Aguarda o tempo especificado e liga o relé
-- **Ativação**: Comando "START" inicia a contagem regressiva
+- **Ativação**: Comando "START_END" inicia a contagem regressiva
 
 ### 2. Retardo na desenergização  
-- **Formato**: "2|0|tempo"
+- **Formato**: "2|0|tempo_END"
 - **Comportamento**: Liga o relé imediatamente e desliga após o tempo especificado
-- **Ativação**: Comando "START" liga o relé e inicia a contagem
+- **Ativação**: Comando "START_END" liga o relé e inicia a contagem
 
 ### 3. Cíclico com início ligado
-- **Formato**: "3|tempo_on|tempo_off"
+- **Formato**: "3|tempo_on|tempo_off_END"
 - **Comportamento**: Inicia ligado, alterna entre ON/OFF nos intervalos especificados
-- **Ativação**: Comando "START" inicia o ciclo começando com relé ligado
+- **Ativação**: Comando "START_END" inicia o ciclo começando com relé ligado
 
 ### 4. Cíclico com início desligado
-- **Formato**: "4|tempo_on|tempo_off"  
+- **Formato**: "4|tempo_on|tempo_off_END"  
 - **Comportamento**: Inicia desligado, alterna entre OFF/ON nos intervalos especificados
-- **Ativação**: Comando "START" inicia o ciclo começando com relé desligado
+- **Ativação**: Comando "START_END" inicia o ciclo começando com relé desligado
 
 ### 5. Partida estrela-triângulo
-- **Formato**: "5|tempo_estrela|0"
+- **Formato**: "5|tempo_estrela|0_END"
 - **Comportamento**: Controla sequência de partida com tempo de transição
-- **Ativação**: Comando "START" inicia a sequência de partida
+- **Ativação**: Comando "START_END" inicia a sequência de partida
 
 ## Considerações de Segurança
 
