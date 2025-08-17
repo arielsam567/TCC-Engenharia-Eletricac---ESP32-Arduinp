@@ -338,6 +338,7 @@ void restaurarEstadoSalvo() {
         break;
       case MODO_2: // Retardo na desenergização - inicia ligado
         relesLigados = true;
+        modoEstrela = false; // Inicializar como false para MODO 2
         debugPrint("⏰ Estado restaurado: Modo 2 - Relés ligados");
         break;
       case MODO_3: // Cíclico com início ligado
@@ -395,6 +396,7 @@ void iniciarModo() {
     case MODO_2: // Retardo na desenergização - inicia ligado
       debugPrint("⏰ Modo 2: Retardo na desenergização - iniciando ligado");
       ligarRele(true);
+      modoEstrela = false; // Inicializar como false para MODO 2
       break;
     case MODO_3: // Cíclico com início ligado
       debugPrint("🔄 Modo 3: Cíclico com início ligado");
@@ -437,16 +439,28 @@ void executarMaquinaEstados() {
       
     case MODO_2: // Retardo na desenergização
       if (!entradaAtiva) {
-        // Entrada desacionada - desligar relés imediatamente
-        if (relesLigados) {
-          debugPrint("🔴 MODO 2: Entrada desacionada - desligando relés imediatamente");
+        // Entrada desacionada - iniciar contagem para desligamento
+        if (relesLigados && !modoEstrela) { // Usar modoEstrela como flag de controle
+          // Primeira vez que entrada foi desacionada - iniciar temporizador
+          modoEstrela = true; // Marcar que temporizador foi iniciado
+          tempoInicio = millis();
+          tempoAtual = 0;
+          debugPrint("🔴 MODO 2: Entrada desacionada - iniciando contagem para desligamento em " + String(config.tempo2) + "s");
+        } else if (relesLigados && modoEstrela && tempoAtual >= config.tempo2) {
+          // Tempo de retardo atingido - desligar relés
+          debugPrint("✅ MODO 2 CONCLUÍDO - Relés desligados após " + String(config.tempo2) + "s");
           ligarRele(false);
           estadoAtual = IDLE;
         }
-      } else if (entradaAtiva && relesLigados && tempoAtual >= config.tempo2) {
-        debugPrint("✅ MODO 2 CONCLUÍDO - Relés desligados após " + String(config.tempo2) + "s");
-        ligarRele(false);
-        estadoAtual = IDLE;
+      } else if (entradaAtiva) {
+        // Entrada acionada - ligar relés imediatamente e resetar temporizador
+        if (!relesLigados) {
+          debugPrint("🟢 MODO 2: Entrada acionada - ligando relés imediatamente");
+          ligarRele(true);
+          modoEstrela = false; // Resetar flag de controle
+          tempoInicio = millis();
+          tempoAtual = 0;
+        }
       }
       break;
       
