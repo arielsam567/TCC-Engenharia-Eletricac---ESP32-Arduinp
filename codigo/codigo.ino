@@ -201,28 +201,27 @@ void processarComandosRecebidos() {
       String comandoProcessado = comandoRecebido.substring(0, comandoRecebido.length() - 4);
       debugPrint("📥 COMANDO RECEBIDO: '" + comandoProcessado + "'");
       
-      if (comandoProcessado == "START") {
-        // Comando para iniciar execução
-        debugPrint("▶️  Comando START recebido");
-        if (estadoAtual == IDLE) {
-          iniciarModo();
-          enviarResposta("OK");
-          debugPrint("✅ Modo iniciado com sucesso");
+      if (comandoProcessado == "CHANGE_RELE_STATUS") {
+        // Comando para alterar estado dos relés
+        debugPrint("🔄 Comando CHANGE_RELE_STATUS recebido");
+        if (relesLigados) {
+          ligarRele(false); // Desliga os relés
+          debugPrint("✅ Relés desligados");
         } else {
-          enviarResposta("ERR: Modo já em execução");
-          debugPrint("⚠️  ERRO: Modo já está em execução");
+          ligarRele(true);  // Liga os relés
+          debugPrint("✅ Relés ligados");
         }
-      } else {
-        // Comando de configuração
+        enviarResposta("OK");
+      } else if (processarConfiguracao(comandoProcessado)) {
+        // Comando de configuração válido
         debugPrint("⚙️  Processando comando de configuração...");
-        if (processarConfiguracao(comandoProcessado)) {
-          salvarConfiguracao();
-          enviarResposta("OK");
-          debugPrint("✅ Configuração aplicada e salva");
-        } else {
-          enviarResposta("ERR: Formato inválido");
-          debugPrint("❌ ERRO: Formato de configuração inválido");
-        }
+        salvarConfiguracao();
+        enviarResposta("OK");
+        debugPrint("✅ Configuração aplicada e salva");
+      } else {
+        // Comando inválido
+        enviarResposta("ERR: Formato inválido");
+        debugPrint("❌ ERRO: Formato de configuração inválido");
       }
       
       comandoRecebido = ""; // Limpar comando

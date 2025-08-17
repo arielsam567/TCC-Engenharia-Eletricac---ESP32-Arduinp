@@ -12,6 +12,14 @@
 - `"4|60|30_END"` - Modo 4, 1 minuto ligado, 30s desligado
 - `"5|10|0_END"` - Modo 5, 10 segundos em estrela
 
+### 2. Comando de Controle Direto dos Relés
+**Formato:** `"CHANGE_RELE_STATUS_END"`
+
+**Descrição:** Altera o estado atual dos relés (liga se estiver desligado, desliga se estiver ligado)
+
+**Exemplo:**
+- `"CHANGE_RELE_STATUS_END"` - Inverte o estado atual dos relés
+
 **Regras:**
 - Todos os comandos DEVEM terminar com `_END`
 - Modos válidos: 1, 2, 3, 4, 5
@@ -19,13 +27,10 @@
 - Separador: caractere pipe `|`
 - Sem espaços extras
 
-### 2. Comando de Ativação
-**Formato:** `"START_END"`
+### 3. Execução Automática
+**Descrição:** Após receber o comando de configuração, o sistema **automaticamente** inicia a execução do modo configurado, mudando o estado dos relés conforme a lógica do modo de operação.
 
-**Descrição:** Inicia a execução do modo previamente configurado
-
-**Exemplo:**
-- `"START_END"`
+**Não é necessário enviar comando separado para iniciar.**
 
 ---
 
@@ -82,24 +87,29 @@
 
 ## 🔄 FLUXO DE COMUNICAÇÃO COMPLETO
 
-### 1. Sequência de Configuração
+### 1. Sequência de Configuração e Execução
 ```
 App Flutter → ESP32: "2|300|0_END"
 ESP32 → App Flutter: "OK"
+ESP32 → App Flutter: "STATUS|RETARDO_DESENERGIZACAO|300|0|LIGADO"
+ESP32 → App Flutter: "OFF" (após 300 segundos)
 ```
 
-### 2. Sequência de Ativação
+### 2. Sequência de Controle Direto dos Relés
 ```
-App Flutter → ESP32: "START_END"
+App Flutter → ESP32: "CHANGE_RELE_STATUS_END"
 ESP32 → App Flutter: "OK"
+ESP32 → App Flutter: "OFF" (se estava ligado) ou "ON" (se estava desligado)
 ```
 
-### 3. Status Automático (após 3 segundos de conexão)
+
+
+### 4. Status Automático (após 3 segundos de conexão)
 ```
 ESP32 → App Flutter: "STATUS|RETARDO_DESENERGIZACAO|300|0|LIGADO"
 ```
 
-### 4. Notificações de Estado
+### 5. Notificações de Estado
 ```
 ESP32 → App Flutter: "ON"    (quando relés ligam)
 ESP32 → App Flutter: "OFF"   (quando relés desligam)
@@ -116,6 +126,7 @@ ESP32 → App Flutter: "OFF"   (quando relés desligam)
 - **Tempos:** Máximo 1.728.000 segundos (20 dias)
 - **Formato:** Exatamente "modo|tempo1|tempo2_END"
 - **Terminação:** Obrigatório terminar com "_END"
+- **Comando especial:** "CHANGE_RELE_STATUS_END" para controle direto dos relés
 
 ### Comportamentos do Sistema
 - **Status automático:** Enviado automaticamente após 3 segundos de conexão
@@ -124,44 +135,44 @@ ESP32 → App Flutter: "OFF"   (quando relés desligam)
 
 ### Tratamento de Erros
 - Comandos inválidos retornam "ERR: Formato inválido"
-- Tentativas de iniciar modo em execução retornam "ERR: Modo já em execução"
 - Sistema continua funcionando mesmo com comandos inválidos
 
 ---
 
 ## 📋 EXEMPLOS COMPLETOS DE USO
 
-### Exemplo 1: Configurar e Ativar Modo 1
+### Exemplo 1: Configurar e Executar Modo 1
 ```
 1. App → ESP32: "1|300|0_END"
 2. ESP32 → App: "OK"
-3. App → ESP32: "START_END"
-4. ESP32 → App: "OK"
-5. ESP32 → App: "STATUS|RETARDO_ENERGIZACAO|300|0|DESLIGADO"
-6. ESP32 → App: "ON" (após 5 minutos)
+3. ESP32 → App: "STATUS|RETARDO_ENERGIZACAO|300|0|DESLIGADO"
+4. ESP32 → App: "ON" (após 5 minutos)
 ```
 
-### Exemplo 2: Configurar e Ativar Modo 3
+### Exemplo 2: Configurar e Executar Modo 3
 ```
 1. App → ESP32: "3|60|30_END"
 2. ESP32 → App: "OK"
-3. App → ESP32: "START_END"
-4. ESP32 → App: "OK"
-5. ESP32 → App: "STATUS|CICLICO_INICIO_LIGADO|60|30|LIGADO"
+3. ESP32 → App: "STATUS|CICLICO_INICIO_LIGADO|60|30|LIGADO"
+4. ESP32 → App: "OFF" (após 1 minuto)
+5. ESP32 → App: "ON" (após 30 segundos)
 6. ESP32 → App: "OFF" (após 1 minuto)
-7. ESP32 → App: "ON" (após 30 segundos)
-8. ESP32 → App: "OFF" (após 1 minuto)
 ... (ciclo continua)
 ```
 
-### Exemplo 3: Configurar e Ativar Modo 5
+### Exemplo 3: Configurar e Executar Modo 5
 ```
 1. App → ESP32: "5|10|0_END"
 2. ESP32 → App: "OK"
-3. App → ESP32: "START_END"
-4. ESP32 → App: "OK"
-5. ESP32 → App: "STATUS|ESTRELA_TRIANGULO|10|0|ESTRELA"
-6. ESP32 → App: "STATUS|ESTRELA_TRIANGULO|10|0|TRIANGULO" (após 10s)
+3. ESP32 → App: "STATUS|ESTRELA_TRIANGULO|10|0|ESTRELA"
+4. ESP32 → App: "STATUS|ESTRELA_TRIANGULO|10|0|TRIANGULO" (após 10s)
+```
+
+### Exemplo 4: Controle Direto dos Relés
+```
+1. App → ESP32: "CHANGE_RELE_STATUS_END"
+2. ESP32 → App: "OK"
+3. ESP32 → App: "OFF" (se estava ligado) ou "ON" (se estava desligado)
 ```
 
 ---
@@ -171,14 +182,14 @@ ESP32 → App Flutter: "OFF"   (quando relés desligam)
 ### Estrutura de Comandos
 ```dart
 class ComandosESP32 {
-  // Configurar modo
+  // Configurar modo e iniciar execução automaticamente
   static String configurarModo(int modo, int tempo1, int tempo2) {
     return "$modo|$tempo1|$tempo2_END";
   }
   
-  // Iniciar execução
-  static String iniciarExecucao() {
-    return "START_END";
+  // Alterar estado dos relés diretamente
+  static String alterarEstadoRele() {
+    return "CHANGE_RELE_STATUS_END";
   }
 }
 ```
@@ -186,10 +197,9 @@ class ComandosESP32 {
 ### Estrutura de Respostas
 ```dart
 class RespostasESP32 {
-  // Tipos de resposta
-  static const String OK = "OK";
-  static const String ERRO_FORMATO = "ERR: Formato inválido";
-  static const String ERRO_EXECUCAO = "ERR: Modo já em execução";
+     // Tipos de resposta
+   static const String OK = "OK";
+   static const String ERRO_FORMATO = "ERR: Formato inválido";
   
   // Tipos de notificação
   static const String ON = "ON";
