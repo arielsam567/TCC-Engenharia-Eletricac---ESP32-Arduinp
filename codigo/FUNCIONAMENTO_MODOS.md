@@ -43,50 +43,38 @@ Cada modo é configurado através de dois parâmetros de tempo:
 ---
 
 ## MODO 3 - Cíclico com Início Ligado
-**Descrição:** Sistema opera em ciclo contínuo, alternando entre ligado e desligado, começando com os relés ligados.
+**Descrição:** Sistema opera em ciclo contínuo, alternando entre ligado e desligado, mas apenas quando a entrada estiver acionada.
 
 ### Funcionamento:
-1. **Início do ciclo:**
+1. **Entrada acionada (GPIO34 = HIGH):**
    - Relés iniciam **LIGADOS**
-
-2. **Primeira transição:**
    - Após **X segundos** (T1), desliga os relés
-
-3. **Segunda transição:**
    - Após **Y segundos** (T2), liga os relés novamente
+   - Ciclo continua infinitamente
 
-4. **Ciclo contínuo:**
-   - Repete infinitamente até ser interrompido
+2. **Entrada desacionada (GPIO34 = LOW):**
+   - **Desliga os relés IMEDIATAMENTE** (independente do estado do ciclo)
+   - Ciclo é interrompido
 
-### Aplicações:
-- Controle de ventilação cíclica
-- Sistemas de irrigação intermitente
-- Controle de temperatura alternado
+ 
 
 ---
 
 ## MODO 4 - Cíclico com Início Desligado
-**Descrição:** Sistema opera em ciclo contínuo, alternando entre ligado e desligado, começando com os relés desligados.
+**Descrição:** Sistema opera em ciclo contínuo, alternando entre ligado e desligado, mas apenas quando a entrada estiver acionada.
 
 ### Funcionamento:
-1. **Início do ciclo:**
+1. **Entrada acionada (GPIO34 = HIGH):**
    - Relés iniciam **DESLIGADOS**
-
-2. **Primeira transição:**
    - Após **Y segundos** (T2), liga os relés
-
-3. **Segunda transição:**
    - Após **X segundos** (T1), desliga os relés novamente
+   - Ciclo continua infinitamente
 
-4. **Ciclo contínuo:**
-   - Repete infinitamente até ser interrompido
+2. **Entrada desacionada (GPIO34 = LOW):**
+   - **Desliga os relés IMEDIATAMENTE** (independente do estado do ciclo)
+   - Ciclo é interrompido
 
-### Aplicações:
-- Controle de iluminação cíclica
-- Sistemas de monitoramento intermitente
-- Controle de equipamentos com operação alternada
-
----
+ 
 
 ## MODO 5 - Partida Estrela-Triângulo
 **Descrição:** Sistema implementa partida estrela-triângulo para motores trifásicos, com transição automática após tempo configurado.
