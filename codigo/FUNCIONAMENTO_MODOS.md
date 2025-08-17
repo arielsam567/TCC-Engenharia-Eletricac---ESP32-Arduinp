@@ -80,20 +80,24 @@ Cada modo é configurado através de dois parâmetros de tempo:
 **Descrição:** Sistema implementa partida estrela-triângulo para motores trifásicos, com transição automática após tempo configurado.
 
 ### Funcionamento:
-1. **Início (Modo Estrela):**
-   - **Relé 1 ligado** (GPIO25 = HIGH)
+1. **Entrada desacionada (GPIO34 = LOW):**
+   - **Ambos os relés permanecem DESLIGADOS**
+
+2. **Entrada acionada (GPIO34 = HIGH):**
+   - **Relé 1 ligado** (GPIO25 = HIGH) - Modo Estrela
    - **Relé 2 desligado** (GPIO32 = LOW)
    - Motor opera em configuração estrela (tensão reduzida)
 
-2. **Transição para Triângulo:**
-   - Após **X segundos** (T1), sistema muda para modo triângulo
-   - **Relé 1 desligado** (GPIO25 = LOW)
-   - **Relé 2 ligado** (GPIO32 = HIGH)
+3. **Transição para Triângulo:**
+   - Após **X segundos** (T1), sistema executa transição:
+     - Desliga Relé 1 por **150ms** (tempo de transição)
+     - Liga Relé 2 (GPIO32 = HIGH) - Modo Triângulo
+     - Relé 1 permanece desligado
    - Motor opera em configuração triângulo (tensão plena)
 
-3. **Estado final:**
-   - Sistema permanece em modo triângulo
-   - Não retorna para estrela automaticamente
+4. **Estado final:**
+   - Sistema permanece em modo triângulo até entrada ser desacionada
+   - Ao desacionar entrada, ambos os relés são desligados imediatamente
 
  
 ---
