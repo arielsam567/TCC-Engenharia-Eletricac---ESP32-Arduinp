@@ -8,7 +8,7 @@
 const int entrada = 34;     // GPIO34 (entrada)
 const int saida1 = 25;      // GPIO25 (relé 1)
 const int saida2 = 32;      // GPIO32 (relé 2) 
-const int saida3 = 2;       // GPIO2 (relé 3)
+const int saida3 = 2;       // GPIO2 (relé 3) - Controlado automaticamente pelo status do Bluetooth
 
 // Configurações BLE
 #define DEVICE_NAME "RelayTimer"
@@ -64,12 +64,16 @@ void inicializarBLE();
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
       deviceConnected = true;
-      Serial.println("Dispositivo conectado!");
+      // Ligar a porta 2 (GPIO2) quando Bluetooth conectar
+      digitalWrite(saida3, HIGH);
+      Serial.println("Dispositivo conectado! Porta 2 ligada.");
     };
 
     void onDisconnect(BLEServer* pServer) {
       deviceConnected = false;
-      Serial.println("Dispositivo desconectado!");
+      // Desligar a porta 2 (GPIO2) quando Bluetooth desconectar
+      digitalWrite(saida3, LOW);
+      Serial.println("Dispositivo desconectado! Porta 2 desligada.");
     }
 };
 
@@ -115,7 +119,7 @@ void setup() {
   // Inicializar relés desligados
   digitalWrite(saida1, LOW);
   digitalWrite(saida2, LOW);
-  digitalWrite(saida3, LOW);
+  digitalWrite(saida3, LOW); // Porta 2 (GPIO2) inicia desligada
   
   // Carregar configuração salva
   carregarConfiguracao();
@@ -322,13 +326,13 @@ void ligarRele(bool ligar) {
   if (ligar) {
     digitalWrite(saida1, HIGH);
     digitalWrite(saida2, HIGH);
-    digitalWrite(saida3, HIGH);
+    // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
     Serial.println("Relés LIGADOS");
     enviarNotificacao("ON");
   } else {
     digitalWrite(saida1, LOW);
     digitalWrite(saida2, LOW);
-    digitalWrite(saida3, LOW);
+    // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
     Serial.println("Relés DESLIGADOS");
     enviarNotificacao("OFF");
   }
@@ -338,7 +342,7 @@ void ligarReleEstrela() {
   // Modo estrela: apenas relé 1 ligado
   digitalWrite(saida1, HIGH);
   digitalWrite(saida2, LOW);
-  digitalWrite(saida3, LOW);
+  // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
   relesLigados = true;
   Serial.println("Modo estrela ativado");
   enviarNotificacao("ON");
@@ -348,7 +352,7 @@ void ligarReleTriangulo() {
   // Modo triângulo: relés 2 e 3 ligados
   digitalWrite(saida1, LOW);
   digitalWrite(saida2, HIGH);
-  digitalWrite(saida3, HIGH);
+  // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
   relesLigados = true;
   Serial.println("Modo triângulo ativado");
   enviarNotificacao("ON");
