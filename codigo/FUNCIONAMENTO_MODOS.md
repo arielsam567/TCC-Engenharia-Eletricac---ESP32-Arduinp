@@ -95,11 +95,7 @@ Cada modo é configurado através de dois parâmetros de tempo:
    - Sistema permanece em modo triângulo
    - Não retorna para estrela automaticamente
 
-### Aplicações:
-- Partida de motores trifásicos de média potência
-- Redução de corrente de partida
-- Controle de torque durante aceleração
-
+ 
 ---
 
 ## Controle da Porta 2 (GPIO2)
