@@ -198,31 +198,30 @@ void processarComandosRecebidos() {
       debugPrint("📥 COMANDO RECEBIDO: '" + comandoRecebido + "'");
       
       if (comandoRecebido == "START") {
-          // Comando para iniciar execução
-          debugPrint("▶️  Comando START recebido");
-          if (estadoAtual == IDLE) {
-            iniciarModo();
-            enviarResposta("OK");
-            debugPrint("✅ Modo iniciado com sucesso");
-          } else {
-            enviarResposta("ERR: Modo já em execução");
-            debugPrint("⚠️  ERRO: Modo já está em execução");
-          }
+        // Comando para iniciar execução
+        debugPrint("▶️  Comando START recebido");
+        if (estadoAtual == IDLE) {
+          iniciarModo();
+          enviarResposta("OK");
+          debugPrint("✅ Modo iniciado com sucesso");
         } else {
-          // Comando de configuração
-          debugPrint("⚙️  Processando comando de configuração...");
-          if (processarConfiguracao(comandoRecebido)) {
-            salvarConfiguracao();
-            enviarResposta("OK");
-            debugPrint("✅ Configuração aplicada e salva");
-          } else {
-            enviarResposta("ERR: Formato inválido");
-            debugPrint("❌ ERRO: Formato de configuração inválido");
-          }
+          enviarResposta("ERR: Modo já em execução");
+          debugPrint("⚠️  ERRO: Modo já está em execução");
         }
-        
-        comandoRecebido = ""; // Limpar comando
+      } else {
+        // Comando de configuração
+        debugPrint("⚙️  Processando comando de configuração...");
+        if (processarConfiguracao(comandoRecebido)) {
+          salvarConfiguracao();
+          enviarResposta("OK");
+          debugPrint("✅ Configuração aplicada e salva");
+        } else {
+          enviarResposta("ERR: Formato inválido");
+          debugPrint("❌ ERRO: Formato de configuração inválido");
+        }
       }
+      
+      comandoRecebido = ""; // Limpar comando
     } else {
       // Adicionar caractere ao comando
       comandoRecebido += c;
