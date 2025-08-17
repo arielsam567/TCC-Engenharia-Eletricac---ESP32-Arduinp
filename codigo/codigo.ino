@@ -43,7 +43,8 @@ enum Estados {
   MODO_2,         // Retardo na desenergização
   MODO_3,         // Cíclico com início ligado
   MODO_4,         // Cíclico com início desligado
-  MODO_5          // Partida estrela-triângulo
+  MODO_5,         // Partida estrela-triângulo
+  MODO_6          // Alteração via comando bluetooh
 };
 
 // Estrutura para configuração dos relés
@@ -90,6 +91,7 @@ void enviarNotificacao(String notificacao);
 bool processarConfiguracao(String comando);
 void salvarConfiguracao();
 void carregarConfiguracao();
+void restaurarEstadoSalvo();
 void verificarConexaoBluetooth();
 void processarComandosRecebidos();
 void verificarAlteracaoManual();
@@ -201,7 +203,7 @@ void processarComandosRecebidos() {
       String comandoProcessado = comandoRecebido.substring(0, comandoRecebido.length() - 4);
       debugPrint("📥 COMANDO RECEBIDO: '" + comandoProcessado + "'");
       
-      if (comandoProcessado == "CHANGE_RELE_STATUS") {
+      if (comandoProcessado == "X" && comandoProcessado == "6") {
         // Comando para alterar estado dos relés
         debugPrint("🔄 Comando CHANGE_RELE_STATUS recebido");
         if (relesLigados) {
@@ -293,6 +295,48 @@ void carregarConfiguracao() {
   debugPrint("   Modo: " + String(config.modo));
   debugPrint("   T1: " + String(config.tempo1) + "s");
   debugPrint("   T2: " + String(config.tempo2) + "s");
+  
+  // Restaurar o estado atual baseado na configuração carregada
+  restaurarEstadoSalvo();
+}
+
+void restaurarEstadoSalvo() {
+  // Se há uma configuração válida salva, restaurar o estado
+  if (config.modo >= 1 && config.modo <= 5) {
+    estadoAtual = (Estados)config.modo;
+    debugPrint("🔄 ESTADO RESTAURADO: Modo " + String(config.modo));
+    
+    // Configurar estado inicial dos relés baseado no modo restaurado
+    switch (estadoAtual) {
+      case MODO_1: // Retardo na energização - inicia desligado
+        relesLigados = false;
+        debugPrint("⏰ Estado restaurado: Modo 1 - Relés desligados");
+        break;
+      case MODO_2: // Retardo na desenergização - inicia ligado
+        relesLigados = true;
+        debugPrint("⏰ Estado restaurado: Modo 2 - Relés ligados");
+        break;
+      case MODO_3: // Cíclico com início ligado
+        relesLigados = true;
+        debugPrint("🔄 Estado restaurado: Modo 3 - Relés ligados");
+        break;
+      case MODO_4: // Cíclico com início desligado
+        relesLigados = false;
+        debugPrint("🔄 Estado restaurado: Modo 4 - Relés desligados");
+        break;
+      case MODO_5: // Partida estrela-triângulo - inicia em estrela
+        relesLigados = true;
+        modoEstrela = true;
+        debugPrint("⭐ Estado restaurado: Modo 5 - Estrela ativo");
+        break;
+    }
+    
+    // Atualizar estados anteriores para detecção de alteração manual
+    relesLigadosAnterior = relesLigados;
+    modoEstrelaAnterior = modoEstrela;
+  } else {
+    debugPrint("⚠️  Nenhuma configuração válida encontrada para restaurar");
+  }
 }
 
 void iniciarModo() {
@@ -504,14 +548,27 @@ void enviarStatusAutomatico() {
     }
   }
   
-  // Determinar nome do modo
+  // Determinar nome do modo - se estiver IDLE mas tiver configuração salva, mostrar o modo configurado
   String nomeModo = "IDLE";
-  switch (estadoAtual) {
-    case MODO_1: nomeModo = "RETARDO_ENERGIZACAO"; break;
-    case MODO_2: nomeModo = "RETARDO_DESENERGIZACAO"; break;
-    case MODO_3: nomeModo = "CICLICO_INICIO_LIGADO"; break;
-    case MODO_4: nomeModo = "CICLICO_INICIO_DESLIGADO"; break;
-    case MODO_5: nomeModo = "ESTRELA_TRIANGULO"; break;
+  if (estadoAtual == IDLE && config.modo >= 1 && config.modo <= 5) {
+    // Sistema está em IDLE mas tem configuração salva - mostrar o modo configurado
+    switch (config.modo) {
+      case 1: nomeModo = "RETARDO_ENERGIZACAO"; break;
+      case 2: nomeModo = "RETARDO_DESENERGIZACAO"; break;
+      case 3: nomeModo = "CICLICO_INICIO_LIGADO"; break;
+      case 4: nomeModo = "CICLICO_INICIO_DESLIGADO"; break;
+      case 5: nomeModo = "ESTRELA_TRIANGULO"; break;
+    }
+    debugPrint("📊 Status automático: Sistema em IDLE mas mostrando modo configurado: " + nomeModo);
+  } else {
+    // Sistema está ativo - mostrar estado atual
+    switch (estadoAtual) {
+      case MODO_1: nomeModo = "RETARDO_ENERGIZACAO"; break;
+      case MODO_2: nomeModo = "RETARDO_DESENERGIZACAO"; break;
+      case MODO_3: nomeModo = "CICLICO_INICIO_LIGADO"; break;
+      case MODO_4: nomeModo = "CICLICO_INICIO_DESLIGADO"; break;
+      case MODO_5: nomeModo = "ESTRELA_TRIANGULO"; break;
+    }
   }
   
   // Criar string de status

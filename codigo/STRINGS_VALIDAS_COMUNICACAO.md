@@ -11,14 +11,15 @@
 - `"3|60|30_END"` - Modo 3, 1 minuto ligado, 30s desligado
 - `"4|60|30_END"` - Modo 4, 1 minuto ligado, 30s desligado
 - `"5|10|0_END"` - Modo 5, 10 segundos em estrela
+- `"6|0|0_END"` - Modo 6, alteração via comando bluetooth
 
 ### 2. Comando de Controle Direto dos Relés
-**Formato:** `"CHANGE_RELE_STATUS_END"`
+**Formato:** `"X_END"`
 
 **Descrição:** Altera o estado atual dos relés (liga se estiver desligado, desliga se estiver ligado)
 
 **Exemplo:**
-- `"CHANGE_RELE_STATUS_END"` - Inverte o estado atual dos relés
+- `"X_END"` - Inverte o estado atual dos relés
 
 **Regras:**
 - Todos os comandos DEVEM terminar com `_END`
