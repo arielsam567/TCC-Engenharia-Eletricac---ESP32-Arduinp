@@ -8,15 +8,15 @@
  * ========================================
  * 
  * Para DESATIVAR todos os Serial.println de debug:
- * - Altere a variável DEBUG_ENABLED para false
+ * - Altere a constante DEBUG_ENABLED para false
  * - Não é necessário remover nenhum código
  * 
  * Para ATIVAR novamente:
  * - Altere DEBUG_ENABLED para true
  * 
  * Exemplo:
- * bool DEBUG_ENABLED = false;  // Debug desativado
- * bool DEBUG_ENABLED = true;   // Debug ativado
+ * const bool DEBUG_ENABLED = false;  // Debug desativado
+ * const bool DEBUG_ENABLED = true;   // Debug ativado
  * 
  * ========================================
  */
@@ -75,7 +75,7 @@ unsigned long tempoConexao = 0;
 bool statusEnviado = false;
 
 // Controle de debug - altere para false para desativar todos os Serial.println
-bool DEBUG_ENABLED = true;
+const bool DEBUG_ENABLED = true;
 
 Preferences preferences;
 
