@@ -1,20 +1,21 @@
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+// Inclui a biblioteca para comunicação Bluetooth Serial
+#include "BluetoothSerial.h"
 #include <Preferences.h>
+
+// Verifica se o Bluetooth está realmente disponível no microcontrolador
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to enable it
+#endif
+
+// Cria um objeto para controlar o Bluetooth Serial
+BluetoothSerial SerialBT;
 
 // Definição dos pinos
 const int entrada = 34;     // GPIO34 (entrada)
 const int saida1 = 25;      // GPIO25 (relé 1)
 const int saida2 = 32;      // GPIO32 (relé 2) 
 const int saida3 = 2;       // GPIO2 (relé 3) - Controlado automaticamente pelo status do Bluetooth
-
-// Configurações BLE
-#define DEVICE_NAME "RelayTimer"
-#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-
+const char* btName = "RELÉ MULTIFUNCIONAL - TCC ";
 // Estados da máquina de estados
 enum Estados {
   IDLE,           // Aguardando comando START
@@ -33,10 +34,9 @@ struct ConfigReles {
 };
 
 // Variáveis globais
-BLEServer* pServer = NULL;
-BLECharacteristic* pCharacteristic = NULL;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
+String comandoRecebido = "";
 
 Estados estadoAtual = IDLE;
 ConfigReles config;
@@ -58,53 +58,8 @@ void enviarNotificacao(String notificacao);
 bool processarConfiguracao(String comando);
 void salvarConfiguracao();
 void carregarConfiguracao();
-void inicializarBLE();
-
-// Callback para conexão BLE
-class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
-      deviceConnected = true;
-      // Ligar a porta 2 (GPIO2) quando Bluetooth conectar
-      digitalWrite(saida3, HIGH);
-      Serial.println("Dispositivo conectado! Porta 2 ligada.");
-    };
-
-    void onDisconnect(BLEServer* pServer) {
-      deviceConnected = false;
-      // Desligar a porta 2 (GPIO2) quando Bluetooth desconectar
-      digitalWrite(saida3, LOW);
-      Serial.println("Dispositivo desconectado! Porta 2 desligada.");
-    }
-};
-
-// Callback para característica BLE
-class MyCallbacks: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *pCharacteristic) {
-      String rxValue = String(pCharacteristic->getValue().c_str());
-      
-      if (rxValue.length() > 0) {
-        Serial.println("Comando recebido: " + rxValue);
-        
-        if (rxValue == "START") {
-          // Comando para iniciar execução
-          if (estadoAtual == IDLE) {
-            iniciarModo();
-            enviarResposta("OK");
-          } else {
-            enviarResposta("ERR: Modo já em execução");
-          }
-        } else {
-          // Comando de configuração
-          if (processarConfiguracao(rxValue)) {
-            salvarConfiguracao();
-            enviarResposta("OK");
-          } else {
-            enviarResposta("ERR: Formato inválido");
-          }
-        }
-      }
-    }
-};
+void verificarConexaoBluetooth();
+void processarComandosRecebidos();
 
 void setup() {
   Serial.begin(115200);
@@ -124,24 +79,19 @@ void setup() {
   // Carregar configuração salva
   carregarConfiguracao();
   
-  // Inicializar BLE
-  inicializarBLE();
+  // Inicializar Bluetooth
+  SerialBT.begin(btName); 
   
-  Serial.println("RelayTimer iniciado e aguardando conexão...");
+  Serial.println("RelayTimer iniciado e aguardando conexão Bluetooth...");
+  Serial.println("Nome do dispositivo: RelayTimer");
 }
 
 void loop() {
-  // Verificar conexão BLE
-  if (!deviceConnected && oldDeviceConnected) {
-    delay(500); // dar tempo para finalizar
-    pServer->startAdvertising(); // reiniciar anúncio
-    Serial.println("Reiniciando anúncio BLE");
-    oldDeviceConnected = deviceConnected;
-  }
+  // Verificar conexão Bluetooth
+  verificarConexaoBluetooth();
   
-  if (deviceConnected && !oldDeviceConnected) {
-    oldDeviceConnected = deviceConnected;
-  }
+  // Processar comandos recebidos
+  processarComandosRecebidos();
   
   // Executar máquina de estados
   executarMaquinaEstados();
@@ -149,32 +99,63 @@ void loop() {
   delay(100); // pequena pausa para estabilidade
 }
 
-void inicializarBLE() {
-  BLEDevice::init(DEVICE_NAME);
-  pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
+void verificarConexaoBluetooth() {
+  // Verificar se há dispositivos conectados
+  bool conectado = SerialBT.hasClient();
   
-  BLEService *pService = pServer->createService(SERVICE_UUID);
-  
-  pCharacteristic = pService->createCharacteristic(
-                      CHARACTERISTIC_UUID,
-                      BLECharacteristic::PROPERTY_READ |
-                      BLECharacteristic::PROPERTY_WRITE |
-                      BLECharacteristic::PROPERTY_NOTIFY
-                    );
-                    
-  pCharacteristic->setCallbacks(new MyCallbacks());
-  pCharacteristic->addDescriptor(new BLE2902());
-  
-  pService->start();
-  
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(false);
-  pAdvertising->setMinPreferred(0x0);
-  pServer->getAdvertising()->start();
-  
-  Serial.println("BLE iniciado, aguardando conexão...");
+  if (conectado != deviceConnected) {
+    deviceConnected = conectado;
+    
+    if (deviceConnected) {
+      // Ligar a porta 2 (GPIO2) quando Bluetooth conectar
+      digitalWrite(saida3, HIGH);
+      Serial.println("Dispositivo conectado! Porta 2 ligada.");
+      enviarNotificacao("CONECTADO");
+    } else {
+      // Desligar a porta 2 (GPIO2) quando Bluetooth desconectar
+      digitalWrite(saida3, LOW);
+      Serial.println("Dispositivo desconectado! Porta 2 desligada.");
+    }
+    
+    oldDeviceConnected = deviceConnected;
+  }
+}
+
+void processarComandosRecebidos() {
+  // Se há dados disponíveis no Bluetooth
+  if (SerialBT.available()) {
+    char c = SerialBT.read();
+    
+    if (c == '\n' || c == '\r') {
+      // Comando completo recebido
+      if (comandoRecebido.length() > 0) {
+        Serial.println("Comando recebido: " + comandoRecebido);
+        
+        if (comandoRecebido == "START") {
+          // Comando para iniciar execução
+          if (estadoAtual == IDLE) {
+            iniciarModo();
+            enviarResposta("OK");
+          } else {
+            enviarResposta("ERR: Modo já em execução");
+          }
+        } else {
+          // Comando de configuração
+          if (processarConfiguracao(comandoRecebido)) {
+            salvarConfiguracao();
+            enviarResposta("OK");
+          } else {
+            enviarResposta("ERR: Formato inválido");
+          }
+        }
+        
+        comandoRecebido = ""; // Limpar comando
+      }
+    } else {
+      // Adicionar caractere ao comando
+      comandoRecebido += c;
+    }
+  }
 }
 
 bool processarConfiguracao(String comando) {
@@ -359,17 +340,15 @@ void ligarReleTriangulo() {
 }
 
 void enviarResposta(String resposta) {
-  if (deviceConnected && pCharacteristic != NULL) {
-    pCharacteristic->setValue(resposta.c_str());
-    pCharacteristic->notify();
+  if (deviceConnected) {
+    SerialBT.println(resposta);
     Serial.println("Resposta enviada: " + resposta);
   }
 }
 
 void enviarNotificacao(String notificacao) {
-  if (deviceConnected && pCharacteristic != NULL) {
-    pCharacteristic->setValue(notificacao.c_str());
-    pCharacteristic->notify();
+  if (deviceConnected) {
+    SerialBT.println(notificacao);
     Serial.println("Notificação enviada: " + notificacao);
   }
 }
