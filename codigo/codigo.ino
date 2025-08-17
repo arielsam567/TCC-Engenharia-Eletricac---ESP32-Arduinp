@@ -189,6 +189,7 @@ void processarComandosRecebidos() {
   // Se há dados disponíveis no Bluetooth
   if (SerialBT.available()) {
     char c = SerialBT.read();
+    debugPrint("📱 CHAR RECEBIDO: '" + String(c) + "' (ASCII: " + String((int)c) + ")");
     
     if (c == '\n' || c == '\r') {
       // Comando completo recebido

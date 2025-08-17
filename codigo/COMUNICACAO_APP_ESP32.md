@@ -123,6 +123,148 @@ O `BTProvider` gerencia:
 - Validação de comandos antes do envio
 - Feedback visual para o usuário sobre o status da comunicação
 
+## Exemplos Práticos de Envio de Dados
+
+### Como Enviar Comandos do App Flutter
+
+#### 1. Configuração de Modos
+
+**Formato Geral:**
+```
+"modo|tempo1|tempo2"
+```
+
+**Exemplos Práticos:**
+
+- **Modo 1 - Retardo na energização (5 minutos):**
+  ```
+  "1|300|0"
+  ```
+  - Modo: 1
+  - Tempo1: 300 segundos (5 minutos)
+  - Tempo2: 0 (não usado neste modo)
+
+- **Modo 2 - Retardo na desenergização (2 minutos):**
+  ```
+  "2|0|120"
+  ```
+  - Modo: 2
+  - Tempo1: 0 (não usado neste modo)
+  - Tempo2: 120 segundos (2 minutos)
+
+- **Modo 3 - Cíclico com início ligado (1 min ligado, 30s desligado):**
+  ```
+  "3|60|30"
+  ```
+  - Modo: 3
+  - Tempo1: 60 segundos (1 minuto ligado)
+  - Tempo2: 30 segundos (30 segundos desligado)
+
+- **Modo 4 - Cíclico com início desligado (30s desligado, 1 min ligado):**
+  ```
+  "4|60|30"
+  ```
+  - Modo: 4
+  - Tempo1: 60 segundos (1 minuto ligado)
+  - Tempo2: 30 segundos (30 segundos desligado)
+
+- **Modo 5 - Partida estrela-triângulo (10 segundos em estrela):**
+  ```
+  "5|10|0"
+  ```
+  - Modo: 5
+  - Tempo1: 10 segundos (tempo em estrela)
+  - Tempo2: 0 (não usado neste modo)
+
+#### 2. Comando de Ativação
+
+**Para iniciar a execução após configurar o modo:**
+```
+"START"
+```
+
+#### 3. Código de Exemplo em Flutter
+
+```dart
+class BluetoothService {
+  BluetoothConnection? connection;
+  
+  // Enviar configuração de modo
+  Future<void> configurarModo(int modo, int tempo1, int tempo2) async {
+    if (connection?.isConnected == true) {
+      String comando = "$modo|$tempo1|$tempo2";
+      print("📤 Enviando configuração: $comando");
+      
+      try {
+        connection!.output.add(Uint8List.fromList(comando.codeUnits));
+        await connection!.output.flush();
+        print("✅ Configuração enviada com sucesso");
+      } catch (e) {
+        print("❌ Erro ao enviar configuração: $e");
+      }
+    }
+  }
+  
+  // Iniciar execução do modo configurado
+  Future<void> iniciarExecucao() async {
+    if (connection?.isConnected == true) {
+      String comando = "START";
+      print("📤 Enviando comando START");
+      
+      try {
+        connection!.output.add(Uint8List.fromList(comando.codeUnits));
+        await connection!.output.flush();
+        print("✅ Comando START enviado com sucesso");
+      } catch (e) {
+        print("❌ Erro ao enviar START: $e");
+      }
+    }
+  }
+  
+  // Exemplo de uso
+  Future<void> configurarModo1() async {
+    // Configurar modo 1: retardo de 5 minutos na energização
+    await configurarModo(1, 300, 0);
+    
+    // Aguardar um pouco para a configuração ser processada
+    await Future.delayed(Duration(milliseconds: 500));
+    
+    // Iniciar execução
+    await iniciarExecucao();
+  }
+}
+```
+
+#### 4. Sequência Completa de Uso
+
+1. **Conectar ao dispositivo:**
+   - Escanear dispositivos Bluetooth
+   - Conectar ao "RELÉ MULTIFUNCIONAL - TCC"
+
+2. **Configurar modo (opcional se já configurado):**
+   ```dart
+   await bluetoothService.configurarModo(3, 60, 30);
+   ```
+
+3. **Iniciar execução:**
+   ```dart
+   await bluetoothService.iniciarExecucao();
+   ```
+
+4. **Monitorar respostas:**
+   - "OK" = configuração aplicada com sucesso
+   - "ERR: Formato inválido" = erro no formato do comando
+   - "ON"/"OFF" = notificações de estado dos relés
+   - "STATUS|..." = status automático do sistema
+
+#### 5. Validações Importantes
+
+- **Tempos máximos:** Até 20 dias (1.728.000 segundos)
+- **Formato:** Exatamente "modo|tempo1|tempo2" (sem espaços)
+- **Modos válidos:** 1, 2, 3, 4 ou 5
+- **Conexão:** Deve estar conectado antes de enviar comandos
+- **Sequência:** Configurar primeiro, depois enviar START
+
 ## Modos de Operação
 
 ### 1. Retardo na energização
