@@ -50,7 +50,7 @@ enum Estados {
 struct ConfigReles {
   int modo;
   unsigned long tempo1;  // em segundos
-  unsigned long tempo2;  // em segundos
+  unsigned long tempo1;  // em segundos (usando sempre tempo1)
 };
 
 // Variáveis globais
@@ -235,24 +235,24 @@ void processarComandosRecebidos() {
 }
 
 bool processarConfiguracao(String comando) {
-  // Verificar se é comando de configuração (formato: "modo|tempo1|tempo2")
+  // Verificar se é comando de configuração (formato: "modo|tempo1|tempo1")
   int pipe1 = comando.indexOf('|');
   int pipe2 = comando.indexOf('|', pipe1 + 1);
   
   if (pipe1 == -1 || pipe2 == -1) {
     debugPrint("❌ FORMATO INVÁLIDO: " + comando);
-    debugPrint("   Formato esperado: 'modo|tempo1|tempo2'");
+    debugPrint("   Formato esperado: 'modo|tempo1|tempo1'");
     return false;
   }
   
   int modo = comando.substring(0, pipe1).toInt();
   unsigned long t1 = comando.substring(pipe1 + 1, pipe2).toInt();
-  unsigned long t2 = comando.substring(pipe2 + 1).toInt();
+  unsigned long t1 = comando.substring(pipe2 + 1).toInt();
   
   debugPrint("🔍 ANÁLISE DO COMANDO:");
   debugPrint("   Modo: " + String(modo));
   debugPrint("   Tempo 1: " + String(t1) + "s");
-  debugPrint("   Tempo 2: " + String(t2) + "s");
+  debugPrint("   Tempo 1: " + String(t1) + "s");
   
   // Validar modo
   if (modo < 1 || modo > 5) {
@@ -261,7 +261,7 @@ bool processarConfiguracao(String comando) {
   }
   
   // Validar tempos (máximo 20 dias = 1.728.000 segundos)
-  if (t1 > 1728000 || t2 > 1728000) {
+  if (t1 > 1728000 || t1 > 1728000) {
     debugPrint("❌ TEMPO MUITO LONGO: máximo 20 dias (1.728.000s)");
     return false;
   }
@@ -288,12 +288,12 @@ bool processarConfiguracao(String comando) {
   
   config.modo = modo;
   config.tempo1 = t1;
-  config.tempo2 = t2;
+  config.tempo1 = t1;
   
   debugPrint("✅ CONFIGURAÇÃO VÁLIDA:");
   debugPrint("   Modo: " + String(modo));
   debugPrint("   T1: " + String(t1) + "s");
-  debugPrint("   T2: " + String(t2) + "s");
+  debugPrint("   T1: " + String(t1) + "s");
   
   return true;
 }
@@ -302,7 +302,7 @@ void salvarConfiguracao() {
   preferences.begin("relaytimer", false);
   preferences.putInt("modo", config.modo);
   preferences.putULong("tempo1", config.tempo1);
-  preferences.putULong("tempo2", config.tempo2);
+  preferences.putULong("tempo1", config.tempo1);
   preferences.end();
   debugPrint("💾 Configuração salva na EEPROM");
 }
@@ -311,13 +311,13 @@ void carregarConfiguracao() {
   preferences.begin("relaytimer", true);
   config.modo = preferences.getInt("modo", 1);
   config.tempo1 = preferences.getULong("tempo1", 300);
-  config.tempo2 = preferences.getULong("tempo2", 0);
+  config.tempo1 = preferences.getULong("tempo1", 0);
   preferences.end();
   
   debugPrint("📖 CONFIGURAÇÃO CARREGADA DA EEPROM:");
   debugPrint("   Modo: " + String(config.modo));
   debugPrint("   T1: " + String(config.tempo1) + "s");
-  debugPrint("   T2: " + String(config.tempo2) + "s");
+  debugPrint("   T1: " + String(config.tempo1) + "s");
   
   // Restaurar o estado atual baseado na configuração carregada
   restaurarEstadoSalvo();
@@ -460,10 +460,10 @@ void executarMaquinaEstados() {
           modoEstrela = true; // Marcar que temporizador foi iniciado
           tempoInicio = millis();
           tempoAtual = 0;
-          debugPrint("🔴 MODO 2: Entrada desacionada - iniciando contagem para desligamento em " + String(config.tempo2) + "s");
-        } else if (relesLigados && modoEstrela && tempoAtual >= config.tempo2) {
+          debugPrint("🔴 MODO 2: Entrada desacionada - iniciando contagem para desligamento em " + String(config.tempo1) + "s");
+        } else if (relesLigados && modoEstrela && tempoAtual >= config.tempo1) {
           // Tempo de retardo atingido - desligar relés
-          debugPrint("✅ MODO 2 CONCLUÍDO - Relés desligados após " + String(config.tempo2) + "s");
+          debugPrint("✅ MODO 2 CONCLUÍDO - Relés desligados após " + String(config.tempo1) + "s");
           ligarRele(false);
           estadoAtual = MODO_2; // Permanecer no MODO_2
         }
@@ -496,15 +496,15 @@ void executarMaquinaEstados() {
           tempoAtual = 0;
           debugPrint("⏰ MODO 3: Iniciando ciclo - relés ligados, aguardando " + String(config.tempo1) + "s para desligar");
         } else if (relesLigados && tempoAtual >= config.tempo1) {
-          // Tempo T1 atingido - desligar relés e iniciar temporizador T2
+          // Tempo T1 atingido - desligar relés e iniciar temporizador T1
           debugPrint("🔄 MODO 3: Desligando relés após " + String(config.tempo1) + "s");
           ligarRele(false);
           tempoInicio = millis();
           tempoAtual = 0;
-          debugPrint("⏰ MODO 3: Relés desligados, aguardando " + String(config.tempo2) + "s para ligar");
-        } else if (!relesLigados && tempoAtual >= config.tempo2) {
-          // Tempo T2 atingido - ligar relés e reiniciar ciclo
-          debugPrint("🔄 MODO 3: Ligando relés após " + String(config.tempo2) + "s");
+          debugPrint("⏰ MODO 3: Relés desligados, aguardando " + String(config.tempo1) + "s para ligar");
+        } else if (!relesLigados && tempoAtual >= config.tempo1) {
+          // Tempo T1 atingido - ligar relés e reiniciar ciclo
+          debugPrint("🔄 MODO 3: Ligando relés após " + String(config.tempo1) + "s");
           ligarRele(true);
           tempoInicio = millis();
           tempoAtual = 0;
@@ -525,13 +525,13 @@ void executarMaquinaEstados() {
       } else if (entradaAtiva) {
         // Entrada acionada - controlar ciclo
         if (!relesLigados && tempoAtual == 0) {
-          // Primeira vez que entrada foi acionada com relés desligados - iniciar temporizador T2
+          // Primeira vez que entrada foi acionada com relés desligados - iniciar temporizador T1
           tempoInicio = millis();
           tempoAtual = 0;
-          debugPrint("⏰ MODO 4: Iniciando ciclo - relés desligados, aguardando " + String(config.tempo2) + "s para ligar");
-        } else if (!relesLigados && tempoAtual >= config.tempo2) {
-          // Tempo T2 atingido - ligar relés e iniciar temporizador T1
-          debugPrint("🔄 MODO 4: Ligando relés após " + String(config.tempo2) + "s");
+          debugPrint("⏰ MODO 4: Iniciando ciclo - relés desligados, aguardando " + String(config.tempo1) + "s para ligar");
+        } else if (!relesLigados && tempoAtual >= config.tempo1) {
+          // Tempo T1 atingido - ligar relés e iniciar temporizador T1
+          debugPrint("🔄 MODO 4: Ligando relés após " + String(config.tempo1) + "s");
           ligarRele(true);
           tempoInicio = millis();
           tempoAtual = 0;
@@ -542,7 +542,7 @@ void executarMaquinaEstados() {
           ligarRele(false);
           tempoInicio = millis();
           tempoAtual = 0;
-          debugPrint("⏰ MODO 4: Relés desligados, aguardando " + String(config.tempo2) + "s para ligar");
+          debugPrint("⏰ MODO 4: Relés desligados, aguardando " + String(config.tempo1) + "s para ligar");
         }
       }
       break;
@@ -707,13 +707,13 @@ void enviarStatusAutomatico() {
   }
   
   // Criar string de status
-  String status = "STATUS|" + nomeModo + "|" + String(config.tempo1) + "|" + String(config.tempo2) + "|" + estadoReles;
+  String status = "STATUS|" + nomeModo + "|" + String(config.tempo1) + "|" + String(config.tempo1) + "|" + estadoReles);
   
   debugPrint("📊 ENVIANDO STATUS AUTOMÁTICO:");
   debugPrint("   " + status);
   debugPrint("   Modo: " + nomeModo);
   debugPrint("   T1: " + String(config.tempo1) + "s");
-  debugPrint("   T2: " + String(config.tempo2) + "s");
+  debugPrint("   T1: " + String(config.tempo1) + "s");
   debugPrint("   Estado dos relés: " + estadoReles);
   
   enviarNotificacao(status);
@@ -735,6 +735,8 @@ void verificarStatusEntrada() {
 
 void debugPrint(String mensagem) {
   if (DEBUG_ENABLED) {
-    Serial.println(mensagem);
+    // implementar com F()
+    Serial.println(F(mensagem));
+    // Serial.println(mensagem);
   }
 }
