@@ -49,7 +49,6 @@ enum Estados {
 // Estrutura para configuração dos relés
 struct ConfigReles {
   int modo;
-  unsigned long tempo1;  // em segundos
   unsigned long tempo1;  // em segundos (usando sempre tempo1)
 };
 
@@ -247,12 +246,12 @@ bool processarConfiguracao(String comando) {
   
   int modo = comando.substring(0, pipe1).toInt();
   unsigned long t1 = comando.substring(pipe1 + 1, pipe2).toInt();
-  unsigned long t1 = comando.substring(pipe2 + 1).toInt();
+  unsigned long t1_aux = comando.substring(pipe2 + 1).toInt();
   
   debugPrint("🔍 ANÁLISE DO COMANDO:");
   debugPrint("   Modo: " + String(modo));
   debugPrint("   Tempo 1: " + String(t1) + "s");
-  debugPrint("   Tempo 1: " + String(t1) + "s");
+  debugPrint("   Tempo 1: " + String(t1_aux) + "s");
   
   // Validar modo
   if (modo < 1 || modo > 5) {
@@ -261,7 +260,7 @@ bool processarConfiguracao(String comando) {
   }
   
   // Validar tempos (máximo 20 dias = 1.728.000 segundos)
-  if (t1 > 1728000 || t1 > 1728000) {
+  if (t1 > 1728000 || t1_aux > 1728000) {
     debugPrint("❌ TEMPO MUITO LONGO: máximo 20 dias (1.728.000s)");
     return false;
   }
@@ -288,12 +287,12 @@ bool processarConfiguracao(String comando) {
   
   config.modo = modo;
   config.tempo1 = t1;
-  config.tempo1 = t1;
+  config.tempo1 = t1_aux;
   
   debugPrint("✅ CONFIGURAÇÃO VÁLIDA:");
   debugPrint("   Modo: " + String(modo));
   debugPrint("   T1: " + String(t1) + "s");
-  debugPrint("   T1: " + String(t1) + "s");
+  debugPrint("   T1: " + String(t1_aux) + "s");
   
   return true;
 }
@@ -301,7 +300,6 @@ bool processarConfiguracao(String comando) {
 void salvarConfiguracao() {
   preferences.begin("relaytimer", false);
   preferences.putInt("modo", config.modo);
-  preferences.putULong("tempo1", config.tempo1);
   preferences.putULong("tempo1", config.tempo1);
   preferences.end();
   debugPrint("💾 Configuração salva na EEPROM");
@@ -311,12 +309,11 @@ void carregarConfiguracao() {
   preferences.begin("relaytimer", true);
   config.modo = preferences.getInt("modo", 1);
   config.tempo1 = preferences.getULong("tempo1", 300);
-  config.tempo1 = preferences.getULong("tempo1", 0);
+  config.tempo1 = preferences.getULong("tempo1", 300);
   preferences.end();
   
   debugPrint("📖 CONFIGURAÇÃO CARREGADA DA EEPROM:");
   debugPrint("   Modo: " + String(config.modo));
-  debugPrint("   T1: " + String(config.tempo1) + "s");
   debugPrint("   T1: " + String(config.tempo1) + "s");
   
   // Restaurar o estado atual baseado na configuração carregada
@@ -707,12 +704,11 @@ void enviarStatusAutomatico() {
   }
   
   // Criar string de status
-  String status = "STATUS|" + nomeModo + "|" + String(config.tempo1) + "|" + String(config.tempo1) + "|" + estadoReles);
+  String status = "STATUS|" + nomeModo + "|" + String(config.tempo1) + "|" + String(config.tempo1) + "|" + estadoReles;
   
   debugPrint("📊 ENVIANDO STATUS AUTOMÁTICO:");
   debugPrint("   " + status);
   debugPrint("   Modo: " + nomeModo);
-  debugPrint("   T1: " + String(config.tempo1) + "s");
   debugPrint("   T1: " + String(config.tempo1) + "s");
   debugPrint("   Estado dos relés: " + estadoReles);
   
@@ -735,8 +731,6 @@ void verificarStatusEntrada() {
 
 void debugPrint(String mensagem) {
   if (DEBUG_ENABLED) {
-    // implementar com F()
-    Serial.println(F(mensagem));
-    // Serial.println(mensagem);
+    Serial.println(mensagem);
   }
 }
