@@ -430,14 +430,23 @@ void executarMaquinaEstados() {
         if (relesLigados) {
           debugPrint("🔴 MODO 1: Entrada desacionada - desligando relés imediatamente");
           ligarRele(false);
-          estadoAtual = MODO_1; // Permanecer no MODO_1
+          // Resetar temporizador para próxima operação
+          tempoInicio = millis();
+          tempoAtual = 0;
         }
-      } else if (entradaAtiva && !relesLigados && tempoAtual >= config.tempo1) {
-        // MODO 1 CONCLUÍDO - relés ligados, mas permanece ativo monitorando entrada
-        debugPrint("✅ MODO 1 CONCLUÍDO - Relés ligados após " + String(config.tempo1) + "s");
-        ligarRele(true);
-        // Sistema permanece no MODO_1 para monitorar entrada continuamente
-        debugPrint("👁️  MODO 1: Permanecendo ativo para monitorar entrada");
+      } else if (entradaAtiva && !relesLigados) {
+        // Entrada acionada e relés desligados - controlar temporizador
+        if (tempoAtual == 0) {
+          // Primeira vez que entrada foi acionada - iniciar temporizador
+          tempoInicio = millis();
+          tempoAtual = 0;
+          debugPrint("⏰ MODO 1: Entrada acionada - iniciando temporizador de " + String(config.tempo1) + "s");
+        } else if (tempoAtual >= config.tempo1) {
+          // Tempo atingido - ligar relés
+          debugPrint("✅ MODO 1 CONCLUÍDO - Relés ligados após " + String(config.tempo1) + "s");
+          ligarRele(true);
+          debugPrint("👁️  MODO 1: Permanecendo ativo para monitorar entrada");
+        }
       }
       // Se entrada estiver ativa e relés já estiverem ligados, não faz nada
       // apenas continua monitorando para detectar quando entrada for desacionada
@@ -472,45 +481,69 @@ void executarMaquinaEstados() {
       
     case MODO_3: // Cíclico com início ligado
       if (!entradaAtiva) {
-        // Entrada desacionada - desligar relés imediatamente
+        // Entrada desacionada - desligar relés imediatamente e interromper ciclo
         if (relesLigados) {
           debugPrint("🔴 MODO 3: Entrada desacionada - desligando relés imediatamente");
           ligarRele(false);
           tempoInicio = millis();
           tempoAtual = 0;
         }
-      } else if (entradaAtiva && relesLigados && tempoAtual >= config.tempo1) {
-        debugPrint("🔄 MODO 3: Desligando relés após " + String(config.tempo1) + "s");
-        ligarRele(false);
-        tempoInicio = millis();
-        tempoAtual = 0;
-      } else if (entradaAtiva && !relesLigados && tempoAtual >= config.tempo2) {
-        debugPrint("🔄 MODO 3: Ligando relés após " + String(config.tempo2) + "s");
-        ligarRele(true);
-        tempoInicio = millis();
-        tempoAtual = 0;
+      } else if (entradaAtiva) {
+        // Entrada acionada - controlar ciclo
+        if (relesLigados && tempoAtual == 0) {
+          // Primeira vez que entrada foi acionada com relés ligados - iniciar temporizador T1
+          tempoInicio = millis();
+          tempoAtual = 0;
+          debugPrint("⏰ MODO 3: Iniciando ciclo - relés ligados, aguardando " + String(config.tempo1) + "s para desligar");
+        } else if (relesLigados && tempoAtual >= config.tempo1) {
+          // Tempo T1 atingido - desligar relés e iniciar temporizador T2
+          debugPrint("🔄 MODO 3: Desligando relés após " + String(config.tempo1) + "s");
+          ligarRele(false);
+          tempoInicio = millis();
+          tempoAtual = 0;
+          debugPrint("⏰ MODO 3: Relés desligados, aguardando " + String(config.tempo2) + "s para ligar");
+        } else if (!relesLigados && tempoAtual >= config.tempo2) {
+          // Tempo T2 atingido - ligar relés e reiniciar ciclo
+          debugPrint("🔄 MODO 3: Ligando relés após " + String(config.tempo2) + "s");
+          ligarRele(true);
+          tempoInicio = millis();
+          tempoAtual = 0;
+          debugPrint("⏰ MODO 3: Relés ligados, aguardando " + String(config.tempo1) + "s para desligar");
+        }
       }
       break;
       
     case MODO_4: // Cíclico com início desligado
       if (!entradaAtiva) {
-        // Entrada desacionada - desligar relés imediatamente
+        // Entrada desacionada - desligar relés imediatamente e interromper ciclo
         if (relesLigados) {
           debugPrint("🔴 MODO 4: Entrada desacionada - desligando relés imediatamente");
           ligarRele(false);
           tempoInicio = millis();
           tempoAtual = 0;
         }
-      } else if (entradaAtiva && !relesLigados && tempoAtual >= config.tempo2) {
-        debugPrint("🔄 MODO 4: Ligando relés após " + String(config.tempo2) + "s");
-        ligarRele(true);
-        tempoInicio = millis();
-        tempoAtual = 0;
-      } else if (entradaAtiva && relesLigados && tempoAtual >= config.tempo1) {
-        debugPrint("🔄 MODO 4: Desligando relés após " + String(config.tempo1) + "s");
-        ligarRele(false);
-        tempoInicio = millis();
-        tempoAtual = 0;
+      } else if (entradaAtiva) {
+        // Entrada acionada - controlar ciclo
+        if (!relesLigados && tempoAtual == 0) {
+          // Primeira vez que entrada foi acionada com relés desligados - iniciar temporizador T2
+          tempoInicio = millis();
+          tempoAtual = 0;
+          debugPrint("⏰ MODO 4: Iniciando ciclo - relés desligados, aguardando " + String(config.tempo2) + "s para ligar");
+        } else if (!relesLigados && tempoAtual >= config.tempo2) {
+          // Tempo T2 atingido - ligar relés e iniciar temporizador T1
+          debugPrint("🔄 MODO 4: Ligando relés após " + String(config.tempo2) + "s");
+          ligarRele(true);
+          tempoInicio = millis();
+          tempoAtual = 0;
+          debugPrint("⏰ MODO 4: Relés ligados, aguardando " + String(config.tempo1) + "s para desligar");
+        } else if (relesLigados && tempoAtual >= config.tempo1) {
+          // Tempo T1 atingido - desligar relés e reiniciar ciclo
+          debugPrint("🔄 MODO 4: Desligando relés após " + String(config.tempo1) + "s");
+          ligarRele(false);
+          tempoInicio = millis();
+          tempoAtual = 0;
+          debugPrint("⏰ MODO 4: Relés desligados, aguardando " + String(config.tempo2) + "s para ligar");
+        }
       }
       break;
       
