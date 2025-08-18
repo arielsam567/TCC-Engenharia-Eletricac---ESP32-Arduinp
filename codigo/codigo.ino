@@ -57,7 +57,7 @@ bool deviceConnected = false;
 bool oldDeviceConnected = false;
 String comandoRecebido = "";
 
-Estados estadoAtual = MODO_1; // Inicializa com MODO_1 (valor 1)
+Estados estadoAtual = (Estados)DEFAULT_MODO; // Inicializa com modo padrão
 ConfigReles config;
 unsigned long tempoInicio = 0;
 unsigned long tempoAtual = 0;
@@ -66,6 +66,32 @@ bool modoEstrela = true; // true = estrela, false = triangulo
 
 // Tempo de transição estrela-triângulo (em milissegundos)
 const unsigned long TEMPO_TRANSICAO_ESTRELA_TRIANGULO = 150;
+
+// Valores default para configuração
+const int DEFAULT_MODO = 1;
+const unsigned long DEFAULT_TEMPO1 = 300; // 5 minutos em segundos
+
+// Valores de validação para modo
+const int MIN_MODO = 1;
+const int MAX_MODO = 5;
+
+// Valores de validação para tempo
+const unsigned long MAX_TEMPO = 1728000; // 20 dias em segundos
+const unsigned long SEGUNDOS_POR_DIA = 86400; // Segundos em um dia
+
+// Tempos de controle
+const unsigned long TEMPO_STATUS_AUTOMATICO = 3000; // 3 segundos para envio automático de status
+const unsigned long TEMPO_LOG_MODO = 5000; // 5 segundos para log do modo
+const unsigned long DELAY_LOOP = 100; // Delay do loop principal em milissegundos
+const unsigned long CONVERSOR_SEGUNDOS = 1000; // Conversor de millis() para segundos
+
+// Configurações de comunicação
+const unsigned long VELOCIDADE_SERIAL = 115200; // Velocidade do Serial em bauds
+
+// Valores de controle
+const int VALOR_INVALIDO = -1; // Valor para indicar erro ou inválido
+const int VALOR_NAO_ENCONTRADO = -1; // Valor para indicar que não foi encontrado
+const unsigned long VALOR_INICIAL = 0; // Valor inicial para variáveis de tempo
 
 // Variáveis para controle de alteração manual
 bool relesLigadosAnterior = false;
@@ -108,7 +134,7 @@ void verificarStatusEntrada();
 void debugPrint(String mensagem);
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(VELOCIDADE_SERIAL);
   debugPrint("=== INICIANDO RELAY TIMER ===");
   
   // Configuração dos pinos
@@ -150,7 +176,7 @@ void loop() {
   // Executar máquina de estados
   executarMaquinaEstados();
   
-  delay(100); //  pausa para estabilidade
+  delay(DELAY_LOOP); // pausa para estabilidade
 }
 
 void verificarConexaoBluetooth() {
@@ -182,8 +208,8 @@ void verificarConexaoBluetooth() {
     oldDeviceConnected = deviceConnected;
   }
   
-  // Verificar se deve enviar status automático (após 3 segundos)
-  if (deviceConnected && !statusEnviado && (millis() - tempoConexao) >= 3000) {
+  // Verificar se deve enviar status automático
+  if (deviceConnected && !statusEnviado && (millis() - tempoConexao) >= TEMPO_STATUS_AUTOMATICO) {
     debugPrint("📊 Enviando status automático após conexão Bluetooth");
     enviarStatusAutomatico();
     statusEnviado = true;
@@ -240,7 +266,7 @@ bool processarConfiguracao(String comando) {
   int pipe1 = comando.indexOf('|');
   int pipe2 = comando.indexOf('|', pipe1 + 1);
   
-  if (pipe1 == -1 || pipe2 == -1) {
+  if (pipe1 == VALOR_INVALIDO || pipe2 == VALOR_INVALIDO) {
     debugPrint("❌ Formato inválido: " + comando);
     return false;
   }
@@ -252,14 +278,14 @@ bool processarConfiguracao(String comando) {
   debugPrint("📊 Valores extraídos - Modo: " + String(modo) + ", T1: " + String(t1) + ", T1_aux: " + String(t1_aux));
   
   // Validar modo
-  if (modo < 1 || modo > 5) {
-    debugPrint("❌ Modo inválido: " + String(modo));
+  if (modo < MIN_MODO || modo > MAX_MODO) {
+    debugPrint("❌ Modo inválido: " + String(modo) + " (deve ser entre " + String(MIN_MODO) + " e " + String(MAX_MODO) + ")");
     return false;
   }
   
-  // Validar tempos (máximo 20 dias = 1.728.000 segundos)
-  if (t1 > 1728000 || t1_aux > 1728000) {
-    debugPrint("❌ Tempo muito longo: máximo 20 dias");
+  // Validar tempos (máximo 20 dias)
+  if (t1 > MAX_TEMPO || t1_aux > MAX_TEMPO) {
+    debugPrint("❌ Tempo muito longo: máximo " + String(MAX_TEMPO / SEGUNDOS_POR_DIA) + " dias");
     return false;
   }
   
@@ -307,8 +333,8 @@ void salvarConfiguracao() {
   
   // Verificar se foi salva corretamente
   preferences.begin("relaytimer", true);
-  int modoSalvo = preferences.getInt("modo", -1);
-  unsigned long tempoSalvo = preferences.getULong("tempo1", 0);
+  int modoSalvo = preferences.getInt("modo", VALOR_NAO_ENCONTRADO);
+  unsigned long tempoSalvo = preferences.getULong("tempo1", VALOR_INICIAL);
   preferences.end();
   
   debugPrint("🔍 Verificação - Modo salvo: " + String(modoSalvo) + ", Tempo salvo: " + String(tempoSalvo));
@@ -318,8 +344,8 @@ void carregarConfiguracao() {
   debugPrint("📖 Iniciando carregamento da configuração da EEPROM");
   
   preferences.begin("relaytimer", true);
-  config.modo = preferences.getInt("modo", 1);
-  config.tempo1 = preferences.getULong("tempo1", 300);
+  config.modo = preferences.getInt("modo", DEFAULT_MODO);
+  config.tempo1 = preferences.getULong("tempo1", DEFAULT_TEMPO1);
   preferences.end();
   
   debugPrint("📖 Configuração carregada da EEPROM - Modo: " + String(config.modo) + ", T1: " + String(config.tempo1) + "s");
@@ -333,7 +359,7 @@ void restaurarEstadoSalvo() {
   debugPrint("🔄 Restaurando estado salvo - Modo configurado: " + String(config.modo));
   
   // Se há uma configuração válida salva, restaurar o estado
-  if (config.modo >= 1 && config.modo <= 5) {
+  if (config.modo >= MIN_MODO && config.modo <= MAX_MODO) {
     estadoAtual = (Estados)config.modo;
     debugPrint("✅ Estado restaurado para MODO " + String(estadoAtual));
     
@@ -369,11 +395,11 @@ void restaurarEstadoSalvo() {
     
     debugPrint("💾 Estados anteriores atualizados - relesLigados: " + String(relesLigados) + ", modoEstrela: " + String(modoEstrela));
   } else {
-    // Se não há configuração, usar MODO_1 como padrão
-    estadoAtual = MODO_1;
+    // Se não há configuração, usar modo padrão
+    estadoAtual = (Estados)DEFAULT_MODO;
     relesLigados = false;
     modoEstrela = true;
-    debugPrint("🔄 Usando MODO_1 como padrão - configuração inválida");
+    debugPrint("🔄 Usando MODO " + String(DEFAULT_MODO) + " como padrão - configuração inválida");
   }
 }
 
@@ -443,7 +469,7 @@ void executarMaquinaEstados() {
   
   // Log apenas quando o status da entrada mudar
   if (entradaAtiva != entradaAtivaAnterior) {
-    unsigned long timestamp = millis() / 1000;
+    unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS;
     debugPrint("🔄 Mudança de status da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA") + " (segundo " + String(timestamp) + ")");
     entradaAtivaAnterior = entradaAtiva;
     
@@ -455,11 +481,11 @@ void executarMaquinaEstados() {
     }
   }
   
-  tempoAtual = (millis() - tempoInicio) / 1000; // converter para segundos
+  tempoAtual = (millis() - tempoInicio) / CONVERSOR_SEGUNDOS; // converter para segundos
   
   // Log do modo atual sendo executado (a cada 5 segundos para não poluir o log)
   static unsigned long ultimoLogModo = 0;
-  if (millis() - ultimoLogModo >= 5000) {
+  if (millis() - ultimoLogModo >= TEMPO_LOG_MODO) {
     debugPrint("🔄 Executando MODO " + String(estadoAtual) + " - Tempo atual: " + String(tempoAtual) + "s");
     ultimoLogModo = millis();
   }
@@ -484,12 +510,12 @@ void executarMaquinaEstados() {
           tempoInicio = millis();
           tempoAtual = 0;
           temporizadorModo1Iniciado = true;
-          unsigned long timestamp = millis() / 1000;
-          debugPrint("⏰ MODO 1: Entrada acionada - iniciando temporizador de " + String(config.tempo1) + "s (segundo " + String(timestamp) + ")");
+                unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS;
+      debugPrint("⏰ MODO 1: Entrada acionada - iniciando temporizador de " + String(config.tempo1) + "s (segundo " + String(timestamp) + ")");
         } else if (tempoAtual >= config.tempo1) {
           // Tempo atingido - ligar relés
-          unsigned long timestamp = millis() / 1000;
-          debugPrint("✅ MODO 1 CONCLUÍDO - Relés ligados após " + String(config.tempo1) + "s (segundo " + String(timestamp) + ")");
+                      unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS;
+            debugPrint("✅ MODO 1 CONCLUÍDO - Relés ligados após " + String(config.tempo1) + "s (segundo " + String(timestamp) + ")");
           ligarRele(true);
         }
       }
@@ -628,7 +654,7 @@ void executarMaquinaEstados() {
 void verificarAlteracaoManual() {
   // Verificar se houve alteração manual nos relés
   if (relesLigados != relesLigadosAnterior) {
-    unsigned long timestamp = millis() / 1000;
+    unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS;
     debugPrint("🔧 Alteração manual detectada (segundo " + String(timestamp) + "):");
     debugPrint("   Estado anterior: " + String(relesLigadosAnterior ? "LIGADO" : "DESLIGADO"));
     debugPrint("   Estado atual: " + String(relesLigados ? "LIGADO" : "DESLIGADO"));
@@ -657,7 +683,7 @@ void verificarAlteracaoManual() {
 }
 
 void enviarNotificacaoAlteracaoManual(bool novoEstado, String tipoAlteracao) {
-  unsigned long timestamp = millis() / 1000; // timestamp em segundos
+  unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS; // timestamp em segundos
   String notificacao = "MANUAL|" + String(timestamp) + "|" + tipoAlteracao + "|" + String(novoEstado ? "ON" : "OFF");
   
   debugPrint("📤 Notificação de alteração manual: " + notificacao);
@@ -676,14 +702,14 @@ void ligarRele(bool ligar) {
     digitalWrite(saida1, HIGH);
     digitalWrite(saida2, HIGH);
     // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
-    unsigned long timestamp = millis() / 1000;
+    unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS;
     debugPrint("🔌 Relés ligados (GPIO25 e GPIO32) - segundo " + String(timestamp));
     enviarNotificacao("ON");
   } else {
     digitalWrite(saida1, LOW);
     digitalWrite(saida2, LOW);
     // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
-    unsigned long timestamp = millis() / 1000;
+    unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS;
     debugPrint("🔌 Relés desligados (GPIO25 e GPIO32) - segundo " + String(timestamp));
     enviarNotificacao("OFF");
   }
