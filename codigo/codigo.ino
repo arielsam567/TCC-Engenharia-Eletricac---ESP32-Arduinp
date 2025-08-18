@@ -38,12 +38,12 @@ const char* btName = "RELÉ MULTIFUNCIONAL - TCC ";
 
 // Estados da máquina de estados
 enum Estados {
-  MODO_1,         // Retardo na energização
-  MODO_2,         // Retardo na desenergização
-  MODO_3,         // Cíclico com início ligado
-  MODO_4,         // Cíclico com início desligado
-  MODO_5,         // Partida estrela-triângulo
-  MODO_6          // Alteração via comando bluetooh
+  MODO_1 = 1,     // Retardo na energização
+  MODO_2 = 2,     // Retardo na desenergização
+  MODO_3 = 3,     // Cíclico com início ligado
+  MODO_4 = 4,     // Cíclico com início desligado
+  MODO_5 = 5,     // Partida estrela-triângulo
+  MODO_6 = 6      // Alteração via comando bluetooh
 };
 
 // Estrutura para configuração dos relés
@@ -57,7 +57,7 @@ bool deviceConnected = false;
 bool oldDeviceConnected = false;
 String comandoRecebido = "";
 
-Estados estadoAtual = MODO_1; // Inicializa com MODO_1
+Estados estadoAtual = MODO_1; // Inicializa com MODO_1 (valor 1)
 ConfigReles config;
 unsigned long tempoInicio = 0;
 unsigned long tempoAtual = 0;
@@ -293,7 +293,6 @@ bool processarConfiguracao(String comando) {
   
   config.modo = modo;
   config.tempo1 = t1;
-  config.tempo1 = t1_aux;
   
   debugPrint("✅ CONFIGURAÇÃO VÁLIDA:");
   debugPrint("   Modo: " + String(modo));
@@ -314,7 +313,6 @@ void salvarConfiguracao() {
 void carregarConfiguracao() {
   preferences.begin("relaytimer", true);
   config.modo = preferences.getInt("modo", 1);
-  config.tempo1 = preferences.getULong("tempo1", 300);
   config.tempo1 = preferences.getULong("tempo1", 300);
   preferences.end();
   
