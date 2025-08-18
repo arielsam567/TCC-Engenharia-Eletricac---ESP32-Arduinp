@@ -52,20 +52,9 @@ struct ConfigReles {
   unsigned long tempo1;  // em segundos (usando sempre tempo1)
 };
 
-// Variáveis globais
-bool deviceConnected = false;
-bool oldDeviceConnected = false;
-String comandoRecebido = "";
-
-Estados estadoAtual = (Estados)DEFAULT_MODO; // Inicializa com modo padrão
-ConfigReles config;
-unsigned long tempoInicio = 0;
-unsigned long tempoAtual = 0;
-bool relesLigados = false;
-bool modoEstrela = true; // true = estrela, false = triangulo
-
-// Tempo de transição estrela-triângulo (em milissegundos)
-const unsigned long TEMPO_TRANSICAO_ESTRELA_TRIANGULO = 150;
+// ========================================
+// CONSTANTES DO SISTEMA
+// ========================================
 
 // Valores default para configuração
 const int DEFAULT_MODO = 1;
@@ -93,6 +82,27 @@ const int VALOR_INVALIDO = -1; // Valor para indicar erro ou inválido
 const int VALOR_NAO_ENCONTRADO = -1; // Valor para indicar que não foi encontrado
 const unsigned long VALOR_INICIAL = 0; // Valor inicial para variáveis de tempo
 
+// Tempo de transição estrela-triângulo (em milissegundos)
+const unsigned long TEMPO_TRANSICAO_ESTRELA_TRIANGULO = 150;
+
+// Controle de debug - altere para false para desativar todos os Serial.println
+const bool DEBUG_ENABLED = true;
+
+// ========================================
+// VARIÁVEIS GLOBAIS
+// ========================================
+
+bool deviceConnected = false;
+bool oldDeviceConnected = false;
+String comandoRecebido = "";
+
+Estados estadoAtual = (Estados)DEFAULT_MODO; // Inicializa com modo padrão
+ConfigReles config;
+unsigned long tempoInicio = 0;
+unsigned long tempoAtual = 0;
+bool relesLigados = false;
+bool modoEstrela = true; // true = estrela, false = triangulo
+
 // Variáveis para controle de alteração manual
 bool relesLigadosAnterior = false;
 bool modoEstrelaAnterior = true;
@@ -107,9 +117,6 @@ bool statusEnviado = false;
 
 // Variáveis para controle de tempo no modo 1
 bool temporizadorModo1Iniciado = false;
-
-// Controle de debug - altere para false para desativar todos os Serial.println
-const bool DEBUG_ENABLED = true;
 
 Preferences preferences;
 
