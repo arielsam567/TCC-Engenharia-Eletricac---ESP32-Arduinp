@@ -72,6 +72,9 @@ bool relesLigadosAnterior = false;
 bool modoEstrelaAnterior = true;
 unsigned long ultimaAlteracaoManual = 0;
 
+// Variável para controle de mudança de status da entrada
+bool entradaAtivaAnterior = false;
+
 // Variáveis para controle de status automático
 unsigned long tempoConexao = 0;
 bool statusEnviado = false;
@@ -117,6 +120,9 @@ void setup() {
   digitalWrite(saida2, LOW);
   digitalWrite(saida3, LOW); // Porta 2 (GPIO2) inicia desligada
   
+  // Inicializar variável de controle da entrada
+  entradaAtivaAnterior = digitalRead(entrada) == HIGH;
+  
   debugPrint("Pinos configurados:");
   debugPrint("- Entrada: GPIO" + String(entrada));
   debugPrint("- Saída 1 (Relé 1): GPIO" + String(saida1));
@@ -148,7 +154,7 @@ void loop() {
   // Executar máquina de estados
   executarMaquinaEstados();
   
-  delay(100); // pequena pausa para estabilidade
+  delay(1000); //  pausa para estabilidade
 }
 
 void verificarConexaoBluetooth() {
@@ -417,7 +423,13 @@ void iniciarModo() {
 void executarMaquinaEstados() {
   // Verificar estado da entrada para modos que dependem dela
   bool entradaAtiva = digitalRead(entrada) == HIGH;
-  // debugPrint("STATUS DA ENTRADA: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
+  
+  // Log apenas quando o status da entrada mudar
+  if (entradaAtiva != entradaAtivaAnterior) {
+    debugPrint("🔄 MUDANÇA DE STATUS DA ENTRADA: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
+    entradaAtivaAnterior = entradaAtiva;
+  }
+  
   tempoAtual = (millis() - tempoInicio) / 1000; // converter para segundos
   
   switch (estadoAtual) {
