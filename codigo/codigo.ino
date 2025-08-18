@@ -591,18 +591,14 @@ void executarMaquinaEstados() {
         if (relesLigados) {
           debugPrint("🔴 MODO 4: Entrada desacionada - desligando relés imediatamente");
           ligarRele(false);
+          // Resetar ciclo para próxima ativação
           tempoInicio = millis();
           tempoAtual = 0;
         }
       } else if (entradaAtiva) {
         // Entrada acionada - controlar ciclo
-        if (!relesLigados && tempoAtual == 0) {
-          // Primeira vez que entrada foi acionada com relés desligados - iniciar temporizador T1
-          tempoInicio = millis();
-          tempoAtual = 0;
-          debugPrint("⏰ MODO 4: Iniciando ciclo - relés desligados, aguardando " + String(config.tempo1) + "s para ligar");
-        } else if (!relesLigados && tempoAtual >= config.tempo1) {
-          // Tempo T1 atingido - ligar relés e iniciar temporizador T1
+        if (!relesLigados && tempoAtual >= config.tempo1) {
+          // Tempo T1 atingido - ligar relés e iniciar contagem para desligar
           debugPrint("🔄 MODO 4: Ligando relés após " + String(config.tempo1) + "s");
           ligarRele(true);
           tempoInicio = millis();
