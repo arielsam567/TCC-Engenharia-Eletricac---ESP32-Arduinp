@@ -79,6 +79,9 @@ bool entradaAtivaAnterior = false;
 unsigned long tempoConexao = 0;
 bool statusEnviado = false;
 
+// Variáveis para controle de tempo no modo 1
+bool temporizadorModo1Iniciado = false;
+
 // Controle de debug - altere para false para desativar todos os Serial.println
 const bool DEBUG_ENABLED = true;
 
@@ -107,7 +110,6 @@ void debugPrint(String mensagem);
 void setup() {
   Serial.begin(115200);
   debugPrint("=== INICIANDO RELAY TIMER ===");
-  debugPrint("Iniciando RelayTimer...");
   
   // Configuração dos pinos
   pinMode(entrada, INPUT);
@@ -123,22 +125,13 @@ void setup() {
   // Inicializar variável de controle da entrada
   entradaAtivaAnterior = digitalRead(entrada) == HIGH;
   
-  debugPrint("Pinos configurados:");
-  debugPrint("- Entrada: GPIO" + String(entrada));
-  debugPrint("- Saída 1 (Relé 1): GPIO" + String(saida1));
-  debugPrint("- Saída 2 (Relé 2): GPIO" + String(saida2));
-  debugPrint("- Saída 3 (Relé 3): GPIO" + String(saida3));
-  
   // Carregar configuração salva
   carregarConfiguracao();
   
   // Inicializar Bluetooth
   SerialBT.begin(btName); 
   
-  debugPrint("=== RELAY TIMER INICIADO ===");
-  debugPrint("Nome do dispositivo Bluetooth: " + String(btName));
-  debugPrint("Aguardando conexão Bluetooth...");
-  debugPrint("================================");
+  debugPrint("Relay Timer iniciado - Modo " + String(config.modo) + " - T1: " + String(config.tempo1) + "s");
 }
 
 void loop() {
@@ -154,7 +147,7 @@ void loop() {
   // Executar máquina de estados
   executarMaquinaEstados();
   
-  delay(1000); //  pausa para estabilidade
+  delay(100); //  pausa para estabilidade
 }
 
 void verificarConexaoBluetooth() {
@@ -167,8 +160,7 @@ void verificarConexaoBluetooth() {
     if (deviceConnected) {
       // Ligar a porta 2 (GPIO2) quando Bluetooth conectar
       digitalWrite(saida3, HIGH);
-      debugPrint("🔵 BLUETOOTH CONECTADO! Porta 2 (GPIO2) ligada.");
-      debugPrint("📱 Dispositivo conectado via Bluetooth Serial");
+      debugPrint("🔵 Bluetooth conectado - Porta 2 ligada");
       
       // Inicializar controle de status automático
       tempoConexao = millis();
@@ -178,8 +170,7 @@ void verificarConexaoBluetooth() {
     } else {
       // Desligar a porta 2 (GPIO2) quando Bluetooth desconectar
       digitalWrite(saida3, LOW);
-      debugPrint("🔴 BLUETOOTH DESCONECTADO! Porta 2 (GPIO2) desligada.");
-      debugPrint("❌ Dispositivo desconectado do Bluetooth");
+      debugPrint("🔴 Bluetooth desconectado - Porta 2 desligada");
       
       // Resetar controle de status automático
       statusEnviado = false;
@@ -199,39 +190,32 @@ void processarComandosRecebidos() {
   // Se há dados disponíveis no Bluetooth
   if (SerialBT.available()) {
     char c = SerialBT.read();
-    debugPrint("📱 CHAR RECEBIDO: '" + String(c) + "' (ASCII: " + String((int)c) + ")");
     
     // Adicionar caractere ao comando
     comandoRecebido += c;
-    debugPrint("📝 COMANDO ACUMULADO: '" + comandoRecebido + "'");
     
     // Verificar se o comando termina com _END
     if (comandoRecebido.endsWith("_END")) {
       // Comando completo recebido - remover _END
       String comandoProcessado = comandoRecebido.substring(0, comandoRecebido.length() - 4);
-      debugPrint("📥 COMANDO RECEBIDO: '" + comandoProcessado + "'");
+      debugPrint("📥 Comando recebido: " + comandoProcessado);
       
       if (comandoProcessado == "X" && comandoProcessado == "6") {
         // Comando para alterar estado dos relés
-        debugPrint("🔄 Comando CHANGE_RELE_STATUS recebido");
         if (relesLigados) {
           ligarRele(false); // Desliga os relés
-          debugPrint("✅ Relés desligados");
         } else {
           ligarRele(true);  // Liga os relés
-          debugPrint("✅ Relés ligados");
         }
         enviarResposta("OK");
       } else if (processarConfiguracao(comandoProcessado)) {
         // Comando de configuração válido
-        debugPrint("⚙️  Processando comando de configuração...");
         salvarConfiguracao();
         enviarResposta("OK");
-        debugPrint("✅ Configuração aplicada e salva");
+        debugPrint("✅ Configuração aplicada");
       } else {
         // Comando inválido ou bloqueado por segurança
-        // A mensagem de erro já foi enviada na função processarConfiguracao
-        debugPrint("❌ ERRO: Configuração não pôde ser aplicada");
+        debugPrint("❌ Configuração não pôde ser aplicada");
       }
       
       comandoRecebido = ""; // Limpar comando
@@ -245,8 +229,7 @@ bool processarConfiguracao(String comando) {
   int pipe2 = comando.indexOf('|', pipe1 + 1);
   
   if (pipe1 == -1 || pipe2 == -1) {
-    debugPrint("❌ FORMATO INVÁLIDO: " + comando);
-    debugPrint("   Formato esperado: 'modo|tempo1|tempo1'");
+    debugPrint("❌ Formato inválido: " + comando);
     return false;
   }
   
@@ -254,28 +237,22 @@ bool processarConfiguracao(String comando) {
   unsigned long t1 = comando.substring(pipe1 + 1, pipe2).toInt();
   unsigned long t1_aux = comando.substring(pipe2 + 1).toInt();
   
-  debugPrint("🔍 ANÁLISE DO COMANDO:");
-  debugPrint("   Modo: " + String(modo));
-  debugPrint("   Tempo 1: " + String(t1) + "s");
-  debugPrint("   Tempo 1: " + String(t1_aux) + "s");
-  
   // Validar modo
   if (modo < 1 || modo > 5) {
-    debugPrint("❌ MODO INVÁLIDO: " + String(modo) + " (deve ser 1-5)");
+    debugPrint("❌ Modo inválido: " + String(modo));
     return false;
   }
   
   // Validar tempos (máximo 20 dias = 1.728.000 segundos)
   if (t1 > 1728000 || t1_aux > 1728000) {
-    debugPrint("❌ TEMPO MUITO LONGO: máximo 20 dias (1.728.000s)");
+    debugPrint("❌ Tempo muito longo: máximo 20 dias");
     return false;
   }
   
   // VERIFICAÇÃO DE SEGURANÇA: Não permitir alterar modo se entrada estiver ativa
   bool entradaAtiva = digitalRead(entrada) == HIGH;
   if (entradaAtiva) {
-    debugPrint("🚨 SEGURANÇA: Tentativa de alterar modo com entrada ativa!");
-    debugPrint("   Para alterar o modo, a entrada deve estar DESLIGADA");
+    debugPrint("🚨 Não é possível alterar modo com entrada ativa!");
     
     // Enviar mensagem de erro via Bluetooth
     if (deviceConnected) {
@@ -288,16 +265,13 @@ bool processarConfiguracao(String comando) {
   
   // Verificar se está tentando alterar para um modo diferente
   if (modo != config.modo) {
-    debugPrint("🔄 ALTERANDO MODO: " + String(config.modo) + " → " + String(modo));
+    debugPrint("🔄 Alterando modo: " + String(config.modo) + " → " + String(modo));
   }
   
   config.modo = modo;
   config.tempo1 = t1;
   
-  debugPrint("✅ CONFIGURAÇÃO VÁLIDA:");
-  debugPrint("   Modo: " + String(modo));
-  debugPrint("   T1: " + String(t1) + "s");
-  debugPrint("   T1: " + String(t1_aux) + "s");
+  debugPrint("✅ Configuração válida - Modo: " + String(modo) + ", T1: " + String(t1) + "s");
   
   return true;
 }
@@ -316,9 +290,7 @@ void carregarConfiguracao() {
   config.tempo1 = preferences.getULong("tempo1", 300);
   preferences.end();
   
-  debugPrint("📖 CONFIGURAÇÃO CARREGADA DA EEPROM:");
-  debugPrint("   Modo: " + String(config.modo));
-  debugPrint("   T1: " + String(config.tempo1) + "s");
+  debugPrint("📖 Configuração carregada - Modo: " + String(config.modo) + ", T1: " + String(config.tempo1) + "s");
   
   // Restaurar o estado atual baseado na configuração carregada
   restaurarEstadoSalvo();
@@ -328,31 +300,25 @@ void restaurarEstadoSalvo() {
   // Se há uma configuração válida salva, restaurar o estado
   if (config.modo >= 1 && config.modo <= 5) {
     estadoAtual = (Estados)config.modo;
-    debugPrint("🔄 ESTADO RESTAURADO: Modo " + String(config.modo));
     
     // Configurar estado inicial dos relés baseado no modo restaurado
     switch (estadoAtual) {
       case MODO_1: // Retardo na energização - inicia desligado
         relesLigados = false;
-        debugPrint("⏰ Estado restaurado: Modo 1 - Relés desligados");
         break;
       case MODO_2: // Retardo na desenergização - inicia ligado
         relesLigados = true;
         modoEstrela = false; // Inicializar como false para MODO 2
-        debugPrint("⏰ Estado restaurado: Modo 2 - Relés ligados");
         break;
       case MODO_3: // Cíclico com início ligado
         relesLigados = true;
-        debugPrint("🔄 Estado restaurado: Modo 3 - Relés ligados");
         break;
       case MODO_4: // Cíclico com início desligado
         relesLigados = false;
-        debugPrint("🔄 Estado restaurado: Modo 4 - Relés desligados");
         break;
       case MODO_5: // Partida estrela-triângulo - inicia desligado
         relesLigados = false;
         modoEstrela = true;
-        debugPrint("⭐ Estado restaurado: Modo 5 - Relés desligados");
         break;
     }
     
@@ -360,7 +326,6 @@ void restaurarEstadoSalvo() {
     relesLigadosAnterior = relesLigados;
     modoEstrelaAnterior = modoEstrela;
   } else {
-    debugPrint("⚠️  Nenhuma configuração válida encontrada para restaurar");
     // Se não há configuração, usar MODO_1 como padrão
     estadoAtual = MODO_1;
     relesLigados = false;
@@ -380,14 +345,13 @@ void iniciarModo() {
   relesLigadosAnterior = false;
   modoEstrelaAnterior = true;
   
-  debugPrint("🚀 INICIANDO MODO " + String(config.modo));
+  debugPrint("🚀 Iniciando modo " + String(config.modo));
   
   // Verificar se a entrada está ativa antes de configurar estado inicial
   bool entradaAtiva = digitalRead(entrada) == HIGH;
   
   if (!entradaAtiva) {
     // Entrada desacionada - todos os modos iniciam com relés desligados
-    debugPrint("🔴 Entrada desacionada - iniciando com relés desligados");
     ligarRele(false);
     return;
   }
@@ -395,24 +359,19 @@ void iniciarModo() {
   // Configurar estado inicial baseado no modo (apenas quando entrada ativa)
   switch (estadoAtual) {
     case MODO_1: // Retardo na energização - inicia desligado
-      debugPrint("⏰ Modo 1: Retardo na energização - iniciando desligado");
       ligarRele(false);
       break;
     case MODO_2: // Retardo na desenergização - inicia ligado
-      debugPrint("⏰ Modo 2: Retardo na desenergização - iniciando ligado");
       ligarRele(true);
       modoEstrela = false; // Inicializar como false para MODO 2
       break;
     case MODO_3: // Cíclico com início ligado
-      debugPrint("🔄 Modo 3: Cíclico com início ligado");
       ligarRele(true);
       break;
     case MODO_4: // Cíclico com início desligado
-      debugPrint("🔄 Modo 4: Cíclico com início desligado");
       ligarRele(false);
       break;
     case MODO_5: // Partida estrela-triângulo - inicia desligado
-      debugPrint("⭐ Modo 5: Partida estrela-triângulo - iniciando desligado");
       ligarRele(false); // Inicia com relés desligados
       break;
   }
@@ -424,8 +383,16 @@ void executarMaquinaEstados() {
   
   // Log apenas quando o status da entrada mudar
   if (entradaAtiva != entradaAtivaAnterior) {
-    debugPrint("🔄 MUDANÇA DE STATUS DA ENTRADA: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
+    unsigned long timestamp = millis() / 1000;
+    debugPrint("🔄 Mudança de status da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA") + " (segundo " + String(timestamp) + ")");
     entradaAtivaAnterior = entradaAtiva;
+    
+    // Resetar temporizador quando entrada mudar de status
+    if (estadoAtual == MODO_1) {
+      temporizadorModo1Iniciado = false;
+      tempoInicio = millis();
+      tempoAtual = 0;
+    }
   }
   
   tempoAtual = (millis() - tempoInicio) / 1000; // converter para segundos
@@ -435,28 +402,30 @@ void executarMaquinaEstados() {
       if (!entradaAtiva) {
         // Entrada desacionada - desligar relés imediatamente
         if (relesLigados) {
-          debugPrint("🔴 MODO 1: Entrada desacionada - desligando relés imediatamente");
+          unsigned long timestamp = millis() / 1000;
+          debugPrint("🔴 MODO 1: Entrada desacionada - desligando relés imediatamente (segundo " + String(timestamp) + ")");
           ligarRele(false);
           // Resetar temporizador para próxima operação
+          temporizadorModo1Iniciado = false;
           tempoInicio = millis();
           tempoAtual = 0;
         }
       } else if (entradaAtiva && !relesLigados) {
         // Entrada acionada e relés desligados - controlar temporizador
-        if (tempoAtual == 0) {
+        if (!temporizadorModo1Iniciado) {
           // Primeira vez que entrada foi acionada - iniciar temporizador
           tempoInicio = millis();
           tempoAtual = 0;
-          debugPrint("⏰ MODO 1: Entrada acionada - iniciando temporizador de " + String(config.tempo1) + "s");
+          temporizadorModo1Iniciado = true;
+          unsigned long timestamp = millis() / 1000;
+          debugPrint("⏰ MODO 1: Entrada acionada - iniciando temporizador de " + String(config.tempo1) + "s (segundo " + String(timestamp) + ")");
         } else if (tempoAtual >= config.tempo1) {
           // Tempo atingido - ligar relés
-          debugPrint("✅ MODO 1 CONCLUÍDO - Relés ligados após " + String(config.tempo1) + "s");
+          unsigned long timestamp = millis() / 1000;
+          debugPrint("✅ MODO 1 CONCLUÍDO - Relés ligados após " + String(config.tempo1) + "s (segundo " + String(timestamp) + ")");
           ligarRele(true);
-          debugPrint("👁️  MODO 1: Permanecendo ativo para monitorar entrada");
         }
       }
-      // Se entrada estiver ativa e relés já estiverem ligados, não faz nada
-      // apenas continua monitorando para detectar quando entrada for desacionada
       break;
       
     case MODO_2: // Retardo na desenergização
@@ -592,7 +561,8 @@ void executarMaquinaEstados() {
 void verificarAlteracaoManual() {
   // Verificar se houve alteração manual nos relés
   if (relesLigados != relesLigadosAnterior) {
-    debugPrint("🔧 ALTERAÇÃO MANUAL DETECTADA:");
+    unsigned long timestamp = millis() / 1000;
+    debugPrint("🔧 Alteração manual detectada (segundo " + String(timestamp) + "):");
     debugPrint("   Estado anterior: " + String(relesLigadosAnterior ? "LIGADO" : "DESLIGADO"));
     debugPrint("   Estado atual: " + String(relesLigados ? "LIGADO" : "DESLIGADO"));
     
@@ -606,7 +576,7 @@ void verificarAlteracaoManual() {
   
   // Verificar alteração no modo estrela-triângulo (apenas para modo 5)
   if (estadoAtual == MODO_5 && modoEstrela != modoEstrelaAnterior) {
-    debugPrint("🔧 ALTERAÇÃO MANUAL DETECTADA (Modo 5):");
+    debugPrint("🔧 Alteração manual detectada (Modo 5):");
     debugPrint("   Modo anterior: " + String(modoEstrelaAnterior ? "ESTRELA" : "TRIÂNGULO"));
     debugPrint("   Modo atual: " + String(modoEstrela ? "ESTRELA" : "TRIÂNGULO"));
     
@@ -623,8 +593,7 @@ void enviarNotificacaoAlteracaoManual(bool novoEstado, String tipoAlteracao) {
   unsigned long timestamp = millis() / 1000; // timestamp em segundos
   String notificacao = "MANUAL|" + String(timestamp) + "|" + tipoAlteracao + "|" + String(novoEstado ? "ON" : "OFF");
   
-  debugPrint("📤 NOTIFICAÇÃO DE ALTERAÇÃO MANUAL:");
-  debugPrint("   " + notificacao);
+  debugPrint("📤 Notificação de alteração manual: " + notificacao);
   
   enviarNotificacao(notificacao);
 }
@@ -636,13 +605,15 @@ void ligarRele(bool ligar) {
     digitalWrite(saida1, HIGH);
     digitalWrite(saida2, HIGH);
     // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
-    debugPrint("🔌 RELÉS LIGADOS (GPIO25 e GPIO32)");
+    unsigned long timestamp = millis() / 1000;
+    debugPrint("🔌 Relés ligados (GPIO25 e GPIO32) - segundo " + String(timestamp));
     enviarNotificacao("ON");
   } else {
     digitalWrite(saida1, LOW);
     digitalWrite(saida2, LOW);
     // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
-    debugPrint("🔌 RELÉS DESLIGADOS (GPIO25 e GPIO32)");
+    unsigned long timestamp = millis() / 1000;
+    debugPrint("🔌 Relés desligados (GPIO25 e GPIO32) - segundo " + String(timestamp));
     enviarNotificacao("OFF");
   }
 }
@@ -653,7 +624,7 @@ void ligarReleEstrela() {
   digitalWrite(saida2, LOW);
   // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
   relesLigados = true;
-  debugPrint("⭐ MODO ESTRELA ATIVADO - Relé 1 ligado, Relé 2 desligado");
+  debugPrint("⭐ Modo estrela ativado - Relé 1 ligado, Relé 2 desligado");
   enviarNotificacao("ON");
 }
 
@@ -663,25 +634,21 @@ void ligarReleTriangulo() {
   digitalWrite(saida2, HIGH);
   // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
   relesLigados = true;
-  debugPrint("🔺 MODO TRIÂNGULO ATIVADO - Relé 1 desligado, Relé 2 ligado");
+  debugPrint("🔺 Modo triângulo ativado - Relé 1 desligado, Relé 2 ligado");
   enviarNotificacao("ON");
 }
 
 void enviarResposta(String resposta) {
   if (deviceConnected) {
     SerialBT.println(resposta);
-    debugPrint("📤 RESPOSTA ENVIADA: '" + resposta + "'");
-  } else {
-    debugPrint("⚠️  TENTATIVA DE ENVIAR RESPOSTA SEM CONEXÃO: '" + resposta + "'");
+    debugPrint("📤 Resposta enviada: " + resposta);
   }
 }
 
 void enviarNotificacao(String notificacao) {
   if (deviceConnected) {
     SerialBT.println(notificacao);
-    debugPrint("📤 NOTIFICAÇÃO ENVIADA: '" + notificacao + "'");
-  } else {
-    debugPrint("⚠️  TENTATIVA DE ENVIAR NOTIFICAÇÃO SEM CONEXÃO: '" + notificacao + "'");
+    debugPrint("📤 Notificação enviada: " + notificacao);
   }
 }
 
@@ -716,11 +683,7 @@ void enviarStatusAutomatico() {
   // Criar string de status
   String status = "STATUS|" + nomeModo + "|" + String(config.tempo1) + "|" + String(config.tempo1) + "|" + estadoReles;
   
-  debugPrint("📊 ENVIANDO STATUS AUTOMÁTICO:");
-  debugPrint("   " + status);
-  debugPrint("   Modo: " + nomeModo);
-  debugPrint("   T1: " + String(config.tempo1) + "s");
-  debugPrint("   Estado dos relés: " + estadoReles);
+  debugPrint("📊 Enviando status automático: " + status);
   
   enviarNotificacao(status);
 }
@@ -736,7 +699,7 @@ void verificarStatusEntrada() {
     }
   }
   
-  debugPrint("📊 STATUS DA ENTRADA: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
+  debugPrint("📊 Status da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
 }
 
 void debugPrint(String mensagem) {
