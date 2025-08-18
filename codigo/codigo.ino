@@ -418,7 +418,7 @@ void executarMaquinaEstados() {
   
   // Verificar estado da entrada para modos que dependem dela
   bool entradaAtiva = digitalRead(entrada) == HIGH;
-  
+  debugPrint("STATUS DA ENTRADA: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
   tempoAtual = (millis() - tempoInicio) / 1000; // converter para segundos
   
   switch (estadoAtual) {
