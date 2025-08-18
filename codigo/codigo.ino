@@ -38,7 +38,6 @@ const char* btName = "RELÉ MULTIFUNCIONAL - TCC ";
 
 // Estados da máquina de estados
 enum Estados {
-  IDLE,           // Aguardando comando START
   MODO_1,         // Retardo na energização
   MODO_2,         // Retardo na desenergização
   MODO_3,         // Cíclico com início ligado
@@ -59,7 +58,7 @@ bool deviceConnected = false;
 bool oldDeviceConnected = false;
 String comandoRecebido = "";
 
-Estados estadoAtual = IDLE;
+Estados estadoAtual = MODO_1; // Inicializa com MODO_1
 ConfigReles config;
 unsigned long tempoInicio = 0;
 unsigned long tempoAtual = 0;
@@ -361,6 +360,11 @@ void restaurarEstadoSalvo() {
     modoEstrelaAnterior = modoEstrela;
   } else {
     debugPrint("⚠️  Nenhuma configuração válida encontrada para restaurar");
+    // Se não há configuração, usar MODO_1 como padrão
+    estadoAtual = MODO_1;
+    relesLigados = false;
+    modoEstrela = true;
+    debugPrint("🔄 Usando MODO_1 como padrão");
   }
 }
 
@@ -414,11 +418,9 @@ void iniciarModo() {
 }
 
 void executarMaquinaEstados() {
-  if (estadoAtual == IDLE) return;
-  
   // Verificar estado da entrada para modos que dependem dela
   bool entradaAtiva = digitalRead(entrada) == HIGH;
-  debugPrint("STATUS DA ENTRADA: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
+  // debugPrint("STATUS DA ENTRADA: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
   tempoAtual = (millis() - tempoInicio) / 1000; // converter para segundos
   
   switch (estadoAtual) {
@@ -428,13 +430,17 @@ void executarMaquinaEstados() {
         if (relesLigados) {
           debugPrint("🔴 MODO 1: Entrada desacionada - desligando relés imediatamente");
           ligarRele(false);
-          estadoAtual = IDLE;
+          estadoAtual = MODO_1; // Permanecer no MODO_1
         }
       } else if (entradaAtiva && !relesLigados && tempoAtual >= config.tempo1) {
+        // MODO 1 CONCLUÍDO - relés ligados, mas permanece ativo monitorando entrada
         debugPrint("✅ MODO 1 CONCLUÍDO - Relés ligados após " + String(config.tempo1) + "s");
         ligarRele(true);
-        estadoAtual = IDLE;
+        // Sistema permanece no MODO_1 para monitorar entrada continuamente
+        debugPrint("👁️  MODO 1: Permanecendo ativo para monitorar entrada");
       }
+      // Se entrada estiver ativa e relés já estiverem ligados, não faz nada
+      // apenas continua monitorando para detectar quando entrada for desacionada
       break;
       
     case MODO_2: // Retardo na desenergização
@@ -450,7 +456,7 @@ void executarMaquinaEstados() {
           // Tempo de retardo atingido - desligar relés
           debugPrint("✅ MODO 2 CONCLUÍDO - Relés desligados após " + String(config.tempo2) + "s");
           ligarRele(false);
-          estadoAtual = IDLE;
+          estadoAtual = MODO_2; // Permanecer no MODO_2
         }
       } else if (entradaAtiva) {
         // Entrada acionada - ligar relés imediatamente e resetar temporizador
@@ -655,28 +661,16 @@ void enviarStatusAutomatico() {
     }
   }
   
-  // Determinar nome do modo - se estiver IDLE mas tiver configuração salva, mostrar o modo configurado
-  String nomeModo = "IDLE";
-  if (estadoAtual == IDLE && config.modo >= 1 && config.modo <= 5) {
-    // Sistema está em IDLE mas tem configuração salva - mostrar o modo configurado
-    switch (config.modo) {
-      case 1: nomeModo = "RETARDO_ENERGIZACAO"; break;
-      case 2: nomeModo = "RETARDO_DESENERGIZACAO"; break;
-      case 3: nomeModo = "CICLICO_INICIO_LIGADO"; break;
-      case 4: nomeModo = "CICLICO_INICIO_DESLIGADO"; break;
-      case 5: nomeModo = "ESTRELA_TRIANGULO"; break;
-      case 6: nomeModo = "CONTROLE_MANUAL"; break;
-    }
-    debugPrint("📊 Status automático: Sistema em IDLE mas mostrando modo configurado: " + nomeModo);
-  } else {
-    // Sistema está ativo - mostrar estado atual
-    switch (estadoAtual) {
-      case MODO_1: nomeModo = "RETARDO_ENERGIZACAO"; break;
-      case MODO_2: nomeModo = "RETARDO_DESENERGIZACAO"; break;
-      case MODO_3: nomeModo = "CICLICO_INICIO_LIGADO"; break;
-      case MODO_4: nomeModo = "CICLICO_INICIO_DESLIGADO"; break;
-      case MODO_5: nomeModo = "ESTRELA_TRIANGULO"; break;
-    }
+  // Determinar nome do modo - sempre mostrar o modo atual
+  String nomeModo = "DESCONHECIDO";
+  switch (estadoAtual) {
+    case MODO_1: nomeModo = "RETARDO_ENERGIZACAO"; break;
+    case MODO_2: nomeModo = "RETARDO_DESENERGIZACAO"; break;
+    case MODO_3: nomeModo = "CICLICO_INICIO_LIGADO"; break;
+    case MODO_4: nomeModo = "CICLICO_INICIO_DESLIGADO"; break;
+    case MODO_5: nomeModo = "ESTRELA_TRIANGULO"; break;
+    case MODO_6: nomeModo = "CONTROLE_MANUAL"; break;
+    default: nomeModo = "MODO_" + String(estadoAtual); break;
   }
   
   // Criar string de status
