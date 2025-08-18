@@ -108,6 +108,10 @@ bool relesLigadosAnterior = false;
 bool modoEstrelaAnterior = true;
 unsigned long ultimaAlteracaoManual = 0;
 
+// Variáveis para controle da transição estrela-triângulo (MODO 5)
+bool transicaoEstrelaTrianguloEmAndamento = false;
+unsigned long tempoInicioTransicao = 0;
+
 // Variável para controle de mudança de status da entrada
 bool entradaAtivaAnterior = false;
 
@@ -617,34 +621,46 @@ void executarMaquinaEstados() {
       
     case MODO_5: // Partida estrela-triângulo
       if (!entradaAtiva) {
-        // Entrada desacionada - desligar relés imediatamente
+        // Entrada desacionada - desligar relés imediatamente e resetar transição
         if (relesLigados) {
           debugPrint("🔴 MODO 5: Entrada desacionada - desligando relés imediatamente");
           ligarRele(false);
           modoEstrela = true; // Reset para modo estrela
+          transicaoEstrelaTrianguloEmAndamento = false; // Cancelar transição em andamento
           tempoInicio = millis();
           tempoAtual = 0;
         }
-      } else if (entradaAtiva && !relesLigados) {
+      } else if (entradaAtiva && !relesLigados && !transicaoEstrelaTrianguloEmAndamento) {
         // Entrada acionada e relés desligados - iniciar modo estrela
         debugPrint("🟢 MODO 5: Entrada acionada - iniciando modo estrela");
         ligarReleEstrela();
         tempoInicio = millis();
         tempoAtual = 0;
-      } else if (entradaAtiva && modoEstrela && tempoAtual >= config.tempo1) {
-        // Transição para triângulo após tempo configurado
-        debugPrint("⭐→🔺 MODO 5: Transição para triângulo após " + String(config.tempo1) + "s");
-        debugPrint("⏱️  Desligando Relé 1 por " + String(TEMPO_TRANSICAO_ESTRELA_TRIANGULO) + "ms");
+      } else if (entradaAtiva && modoEstrela && !transicaoEstrelaTrianguloEmAndamento && tempoAtual >= config.tempo1) {
+        // Iniciar transição para triângulo após tempo configurado
+        debugPrint("⭐→🔺 MODO 5: Iniciando transição para triângulo após " + String(config.tempo1) + "s");
+        debugPrint("⏱️  Desligando Relé 1 para transição");
         
-        // Desligar Relé 1 por tempo de transição
+        // Iniciar transição - desligar Relé 1
         digitalWrite(saida1, LOW);
-        delay(TEMPO_TRANSICAO_ESTRELA_TRIANGULO);
-        
-        // Ligar Relé 2 (modo triângulo)
-        ligarReleTriangulo();
-        modoEstrela = false;
-        tempoInicio = millis();
-        tempoAtual = 0;
+        transicaoEstrelaTrianguloEmAndamento = true;
+        tempoInicioTransicao = millis();
+        debugPrint("⏰ Transição iniciada - aguardando " + String(TEMPO_TRANSICAO_ESTRELA_TRIANGULO) + "ms");
+      } else if (entradaAtiva && transicaoEstrelaTrianguloEmAndamento) {
+        // Verificar se tempo de transição foi atingido
+        unsigned long tempoTransicao = millis() - tempoInicioTransicao;
+        if (tempoTransicao >= TEMPO_TRANSICAO_ESTRELA_TRIANGULO) {
+          // Tempo de transição atingido - completar transição
+          debugPrint("✅ MODO 5: Transição concluída - ligando modo triângulo");
+          
+          // Ligar Relé 2 (modo triângulo)
+          ligarReleTriangulo();
+          modoEstrela = false;
+          transicaoEstrelaTrianguloEmAndamento = false;
+          tempoInicio = millis();
+          tempoAtual = 0;
+          debugPrint("🔺 Modo triângulo ativado com sucesso");
+        }
       }
       break;
   }
@@ -727,7 +743,7 @@ void ligarReleEstrela() {
 }
 
 void ligarReleTriangulo() {
-  // Modo triângulo: relés 2 e 3 ligados
+  // Modo triângulo: apenas relé 2 ligado
   digitalWrite(saida1, LOW);
   digitalWrite(saida2, HIGH);
   // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
