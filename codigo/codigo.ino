@@ -31,9 +31,9 @@ BluetoothSerial SerialBT;
 
 // Definição dos pinos
 const int entrada = 34;     // GPIO34 (entrada)
-const int saida1 = 25;      // GPIO25 (relé 1)
-const int saida2 = 32;      // GPIO32 (relé 2) 
-const int saida3 = 2;       // GPIO2 (relé 3) - Controlado automaticamente pelo status do Bluetooth
+const int rele1 = 25;      // GPIO25 (relé 1)
+const int rele2 = 32;      // GPIO32 (relé 2) 
+const int ledBluetooh = 2;       // GPIO2 (relé 3) - Controlado automaticamente pelo status do Bluetooth
 const char* btName = "RELÉ MULTIFUNCIONAL - TCC ";
 
 // Estados da máquina de estados
@@ -71,7 +71,7 @@ const unsigned long SEGUNDOS_POR_DIA = 86400; // Segundos em um dia
 // Tempos de controle
 const unsigned long TEMPO_STATUS_AUTOMATICO = 3000; // 3 segundos para envio automático de status
 const unsigned long TEMPO_LOG_MODO = 5000; // 5 segundos para log do modo
-const unsigned long DELAY_LOOP = 100; // Delay do loop principal em milissegundos
+const unsigned long DELAY_LOOP = 50; // Delay do loop principal em milissegundos
 const unsigned long CONVERSOR_SEGUNDOS = 1000; // Conversor de millis() para segundos
 
 // Configurações de comunicação
@@ -112,6 +112,12 @@ unsigned long ultimaAlteracaoManual = 0;
 bool transicaoEstrelaTrianguloEmAndamento = false;
 unsigned long tempoInicioTransicao = 0;
 
+// Variáveis para validação da entrada (anti-ruído)
+const int VALIDACAO_ENTRADA_COUNT = 3; // Número de leituras consecutivas necessárias
+int contadorEntradaAtiva = 0;
+int contadorEntradaInativa = 0;
+bool entradaValidada = false; // Estado validado da entrada
+
 // Variável para controle de mudança de status da entrada
 bool entradaAtivaAnterior = false;
 
@@ -150,14 +156,14 @@ void setup() {
   
   // Configuração dos pinos
   pinMode(entrada, INPUT);
-  pinMode(saida1, OUTPUT);
-  pinMode(saida2, OUTPUT);
-  pinMode(saida3, OUTPUT);
+  pinMode(rele1, OUTPUT);
+  pinMode(rele2, OUTPUT);
+  pinMode(ledBluetooh, OUTPUT);
   
   // Inicializar relés desligados
-  digitalWrite(saida1, LOW);
-  digitalWrite(saida2, LOW);
-  digitalWrite(saida3, LOW); // Porta 2 (GPIO2) inicia desligada
+  digitalWrite(rele1, HIGH);
+  digitalWrite(rele2, HIGH);
+  digitalWrite(ledBluetooh, HIGH); // Porta 2 (GPIO2) inicia desligada
   
   // Inicializar variável de controle da entrada
   entradaAtivaAnterior = digitalRead(entrada) == HIGH;
@@ -187,7 +193,7 @@ void loop() {
   // Executar máquina de estados
   executarMaquinaEstados();
   
-  delay(DELAY_LOOP); // pausa para estabilidade
+  // delay(DELAY_LOOP); // pausa para estabilidade
 }
 
 void verificarConexaoBluetooth() {
@@ -199,7 +205,7 @@ void verificarConexaoBluetooth() {
     
     if (deviceConnected) {
       // Ligar a porta 2 (GPIO2) quando Bluetooth conectar
-      digitalWrite(saida3, HIGH);
+      digitalWrite(ledBluetooh, HIGH);
       debugPrint("🔵 Bluetooth conectado - Porta 2 ligada");
       
       // Inicializar controle de status automático
@@ -209,7 +215,7 @@ void verificarConexaoBluetooth() {
       enviarNotificacao("CONECTADO");
     } else {
       // Desligar a porta 2 (GPIO2) quando Bluetooth desconectar
-      digitalWrite(saida3, LOW);
+      digitalWrite(ledBluetooh, LOW);
       debugPrint("🔴 Bluetooth desconectado - Porta 2 desligada");
       
       // Resetar controle de status automático
@@ -301,8 +307,8 @@ bool processarConfiguracao(String comando) {
   }
   
   // VERIFICAÇÃO DE SEGURANÇA: Não permitir alterar modo se entrada estiver ativa
-  bool entradaAtiva = digitalRead(entrada) == HIGH;
-  debugPrint("🔍 Status da entrada durante validação: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
+  bool entradaAtiva = validarEntrada();
+  debugPrint("🔍 Status VALIDADO da entrada durante validação: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
   
   if (entradaAtiva) {
     debugPrint("🚨 Não é possível alterar modo com entrada ativa!");
@@ -459,8 +465,8 @@ void iniciarModo() {
   debugPrint("🚀 Iniciando modo " + String(config.modo) + " - Estado inicial: " + String(relesLigados ? "LIGADO" : "DESLIGADO"));
   
   // Verificar se a entrada está ativa antes de configurar estado inicial
-  bool entradaAtiva = digitalRead(entrada) == HIGH;
-  debugPrint("🔍 Status da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
+  bool entradaAtiva = validarEntrada();
+  debugPrint("🔍 Status VALIDADO da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
   
   if (!entradaAtiva) {
     // Entrada desacionada - todos os modos iniciam com relés desligados
@@ -475,13 +481,13 @@ void iniciarModo() {
 }
 
 void executarMaquinaEstados() {
-  // Verificar estado da entrada para modos que dependem dela
-  bool entradaAtiva = digitalRead(entrada) == HIGH;
+  // Validar entrada com anti-ruído
+  bool entradaAtiva = validarEntrada();
   
-  // Log apenas quando o status da entrada mudar
+  // Log apenas quando o status validado da entrada mudar
   if (entradaAtiva != entradaAtivaAnterior) {
     unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS;
-    debugPrint("🔄 Mudança de status da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA") + " (segundo " + String(timestamp) + ")");
+    debugPrint("🔄 Mudança de status VALIDADO da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA") + " (segundo " + String(timestamp) + ")");
     entradaAtivaAnterior = entradaAtiva;
     
     // Resetar temporizador quando entrada mudar de status
@@ -642,7 +648,7 @@ void executarMaquinaEstados() {
         debugPrint("⏱️  Desligando Relé 1 para transição");
         
         // Iniciar transição - desligar Relé 1
-        digitalWrite(saida1, LOW);
+        digitalWrite(rele1, HIGH);
         transicaoEstrelaTrianguloEmAndamento = true;
         tempoInicioTransicao = millis();
         debugPrint("⏰ Transição iniciada - aguardando " + String(TEMPO_TRANSICAO_ESTRELA_TRIANGULO) + "ms");
@@ -714,15 +720,15 @@ void ligarRele(bool ligar) {
   relesLigados = ligar;
   
   if (ligar) {
-    digitalWrite(saida1, HIGH);
-    digitalWrite(saida2, HIGH);
+    digitalWrite(rele1, LOW);
+    digitalWrite(rele2, LOW);
     // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
     unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS;
     debugPrint("🔌 Relés ligados (GPIO25 e GPIO32) - segundo " + String(timestamp));
     enviarNotificacao("ON");
   } else {
-    digitalWrite(saida1, LOW);
-    digitalWrite(saida2, LOW);
+    digitalWrite(rele1, HIGH);
+    digitalWrite(rele2, HIGH);
     // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
     unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS;
     debugPrint("🔌 Relés desligados (GPIO25 e GPIO32) - segundo " + String(timestamp));
@@ -734,8 +740,8 @@ void ligarRele(bool ligar) {
 
 void ligarReleEstrela() {
   // Modo estrela: apenas relé 1 ligado
-  digitalWrite(saida1, HIGH);
-  digitalWrite(saida2, LOW);
+  digitalWrite(rele2, HIGH);
+  digitalWrite(rele1, LOW);
   // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
   relesLigados = true;
   debugPrint("⭐ Modo estrela ativado - Relé 1 ligado, Relé 2 desligado");
@@ -744,8 +750,8 @@ void ligarReleEstrela() {
 
 void ligarReleTriangulo() {
   // Modo triângulo: apenas relé 2 ligado
-  digitalWrite(saida1, LOW);
-  digitalWrite(saida2, HIGH);
+  digitalWrite(rele2, LOW);
+  digitalWrite(rele1, HIGH);
   // Não alterar saida3 (porta 2) - ela é controlada pelo status do Bluetooth
   relesLigados = true;
   debugPrint("🔺 Modo triângulo ativado - Relé 1 desligado, Relé 2 ligado");
@@ -810,19 +816,51 @@ void enviarStatusAutomatico() {
 }
 
 void verificarStatusEntrada() {
-  bool entradaAtiva = digitalRead(entrada) == HIGH;
+  bool entradaAtiva = validarEntrada();
   
-  debugPrint("🔍 Verificando status da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
+  debugPrint("🔍 Verificando status VALIDADO da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
   
   if (deviceConnected) {
-    if (entradaAtiva) {
+    if (entradaValidada) {
       enviarNotificacao("INFO: Entrada ATIVA - Modo não pode ser alterado");
     } else {
       enviarNotificacao("INFO: Entrada INATIVA - Modo pode ser alterado");
     }
   }
   
-  debugPrint("📊 Status da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA"));
+  debugPrint("📊 Status da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA") + " | Validada: " + String(entradaValidada ? "SIM" : "NÃO"));
+}
+
+// Função para validar entrada com anti-ruído
+bool validarEntrada() {
+  bool leituraAtual = digitalRead(entrada) == HIGH;
+  
+  if (leituraAtual) {
+    // Entrada lida como ativa
+    contadorEntradaAtiva++;
+    contadorEntradaInativa = 0; // Reset contador inativo
+    
+    if (contadorEntradaAtiva >= VALIDACAO_ENTRADA_COUNT && !entradaValidada) {
+      // Entrada validada como ativa
+      entradaValidada = true;
+      debugPrint("✅ Entrada VALIDADA como ATIVA após " + String(VALIDACAO_ENTRADA_COUNT) + " leituras consecutivas");
+      return true;
+    }
+  } else {
+    // Entrada lida como inativa
+    contadorEntradaInativa++;
+    contadorEntradaAtiva = 0; // Reset contador ativo
+    
+    if (contadorEntradaInativa >= VALIDACAO_ENTRADA_COUNT && entradaValidada) {
+      // Entrada validada como inativa
+      entradaValidada = false;
+      debugPrint("✅ Entrada VALIDADA como INATIVA após " + String(VALIDACAO_ENTRADA_COUNT) + " leituras consecutivas");
+      return false;
+    }
+  }
+  
+  // Retorna o estado validado anterior (não mudou ainda)
+  return entradaValidada;
 }
 
 void debugPrint(String mensagem) {
