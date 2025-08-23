@@ -206,7 +206,7 @@ void setup() {
   // Inicializar relés desligados
   digitalWrite(rele1, HIGH);
   digitalWrite(rele2, HIGH);
-  digitalWrite(ledBluetooh, HIGH); // Porta 2 (GPIO2) inicia desligada
+  digitalWrite(ledBluetooh, LOW); // LED Bluetooth inicia desligado (sem conexão)
   
   // Inicializar variável de controle da entrada
   entradaAtivaAnterior = validarEntrada();
@@ -218,6 +218,11 @@ void setup() {
   
   // Inicializar Bluetooth
   SerialBT.begin(btName); 
+  
+  // Verificar status inicial do Bluetooth e configurar LED
+  deviceConnected = SerialBT.hasClient();
+  digitalWrite(ledBluetooh, deviceConnected ? HIGH : LOW);
+  debugPrint("🔵 Status inicial Bluetooth: " + String(deviceConnected ? "CONECTADO" : "DESCONECTADO"));
   
   debugPrint("🚀 Relay Timer iniciado - Modo " + String(config.modo) + " - T1: " + String(config.tempo1) + "s");
   debugPrint("📊 Estado atual após inicialização: " + String(estadoAtual));
@@ -250,9 +255,9 @@ void verificarConexaoBluetooth() {
     deviceConnected = conectado;
     
     if (deviceConnected) {
-      // Ligar a porta 2 (GPIO2) quando Bluetooth conectar
+      // Ligar LED Bluetooth quando conectar
       digitalWrite(ledBluetooh, HIGH);
-      debugPrint("🔵 Bluetooth conectado - Porta 2 ligada");
+      debugPrint("🔵 Bluetooth conectado - LED Bluetooth ligado");
       
       // Inicializar controle de status automático
       tempoConexao = millis();
@@ -260,9 +265,9 @@ void verificarConexaoBluetooth() {
       
       enviarNotificacao("CONECTADO");
     } else {
-      // Desligar a porta 2 (GPIO2) quando Bluetooth desconectar
+      // Desligar LED Bluetooth quando desconectar
       digitalWrite(ledBluetooh, LOW);
-      debugPrint("🔴 Bluetooth desconectado - Porta 2 desligada");
+      debugPrint("🔴 Bluetooth desconectado - LED Bluetooth desligado");
       
       // Resetar controle de status automático
       statusEnviado = false;
