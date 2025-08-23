@@ -40,7 +40,7 @@ const int ledBluetooh = 2;       // GPIO2 (relé 3) - Controlado automaticamente
 
 // Definição dos pinos dos LEDs indicadores
 const int ledAzul = 23;     // GPIO23 - LED Azul (Modos 1, 2 e 5)
-const int ledAmarelo = 22;  // GPIO22 - LED Amarelo (Modos 3, 4 e 5)
+const int ledAmarelo = 22;  // GPIO22 - LED Verde (Modos 3, 4 e 5)
 const int ledVermelho = 19; // GPIO21 - LED Vermelho (Indicador de tensão AC)
 const int ledBranco = 18;   // GPIO18 - LED Branco (Indicador de contagem de tempo e operação cíclica)
 

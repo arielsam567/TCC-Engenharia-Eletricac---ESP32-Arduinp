@@ -8,7 +8,7 @@ Este documento descreve o comportamento dos LEDs indicadores do sistema de contr
 | Porta | Cor do LED | Função |
 |-------|------------|---------|
 | **GPIO 23** | 🔵 **Azul** | Indicador do Modo 1 e 2 |
-| **GPIO 22** | 🟡 **Amarelo** | Indicador do Modo 3 e 4 |
+| **GPIO 22** | 🟢 **Verde** | Indicador do Modo 3 e 4 |
 | **GPIO 19** | 🔴 **Vermelho** | Indicador de leitura da porta 34 (sensor ZMPT101B) |
 | **GPIO 18** | ⚪ **Branco** | Indicador de contagem de tempo e operação cíclica |
 | **GPIO 2** | 🔵 **Azul** | Indicador de status da conexão Bluetooth |
@@ -18,31 +18,31 @@ Este documento descreve o comportamento dos LEDs indicadores do sistema de contr
 
 ### **Modo 1 - Retardo na Energização**
 - **LED Azul (GPIO 23)**: 🔵 **ACESO** - Indica modo ativo
-- **LED Amarelo (GPIO 22)**: ⚫ **DESLIGADO** - Modo não utilizado
+- **LED Verde (GPIO 22)**: ⚫ **DESLIGADO** - Modo não utilizado
 - **LED Branco (GPIO 18)**: ⚪ **PISCANDO** - Pisca apenas durante contagem de tempo para energizar (200ms)
 - **Descrição**: Sistema inicia desligado e aguarda tempo configurado para energizar
 
 ### **Modo 2 - Retardo na Desenergização**
 - **LED Azul (GPIO 23)**: 🔵 **PISCANDO** - Indica modo ativo com contagem regressiva
-- **LED Amarelo (GPIO 22)**: ⚫ **DESLIGADO** - Modo não utilizado
+- **LED Verde (GPIO 22)**: ⚫ **DESLIGADO** - Modo não utilizado
 - **LED Branco (GPIO 18)**: ⚪ **PISCANDO** - Pisca apenas durante contagem de tempo para desenergizar (200ms)
 - **Descrição**: Sistema inicia ligado e aguarda tempo configurado para desenergizar
 
 ### **Modo 3 - Cíclico com Início Ligado**
 - **LED Azul (GPIO 23)**: ⚫ **DESLIGADO** - Modo não utilizado
-- **LED Amarelo (GPIO 22)**: 🟡 **ACESO** - Indica modo ativo
+- **LED Verde (GPIO 22)**: 🟢 **ACESO** - Indica modo ativo
 - **LED Branco (GPIO 18)**: ⚪ **PISCANDO** - Pisca continuamente durante operação cíclica (500ms)
 - **Descrição**: Sistema opera em ciclo contínuo, iniciando na posição ligada
 
 ### **Modo 4 - Cíclico com Início Desligado**
 - **LED Azul (GPIO 23)**: ⚫ **DESLIGADO** - Modo não utilizado
-- **LED Amarelo (GPIO 22)**: 🟡 **PISCANDO** - Indica modo ativo com operação cíclica
+- **LED Verde (GPIO 22)**: 🟢 **PISCANDO** - Indica modo ativo com operação cíclica
 - **LED Branco (GPIO 18)**: ⚪ **PISCANDO** - Pisca continuamente durante operação cíclica (500ms)
 - **Descrição**: Sistema opera em ciclo contínuo, iniciando na posição desligada
 
 ### **Modo 5 - Partida Estrela-Triângulo**
 - **LED Azul (GPIO 23)**: 🔵 **ACESO** - Indica modo ativo
-- **LED Amarelo (GPIO 22)**: 🟡 **ACESO** - Indica modo ativo
+- **LED Verde (GPIO 22)**: 🟢 **ACESO** - Indica modo ativo
 - **LED Branco (GPIO 18)**: ⚪ **PISCANDO** - Pisca apenas durante contagem de tempo estrela-triângulo (200ms)
 - **Descrição**: Ambos os LEDs ficam acesos durante a operação estrela-triângulo
 
@@ -71,7 +71,7 @@ Este documento descreve o comportamento dos LEDs indicadores do sistema de contr
 ### **Modo 5 - Transição Estrela-Triângulo**
 Durante a transição entre estrela e triângulo:
 - **LED Azul (GPIO 23)**: 🔵 **ACESO** - Mantém-se aceso
-- **LED Amarelo (GPIO 22)**: 🟡 **ACESO** - Mantém-se aceso
+- **LED Verde (GPIO 22)**: 🟢 **ACESO** - Mantém-se aceso
 - **Tempo de Transição**: 150ms (configurável)
 
 ## ⚠️ Estados de Erro e Inicialização
@@ -81,7 +81,7 @@ Durante a transição entre estrela e triângulo:
 
 ### **Erro de Comunicação**
 - **LED Azul (GPIO 23)**: 🔵 **PISCANDO RÁPIDO** - Indica erro de comunicação
-- **LED Amarelo (GPIO 22)**: 🟡 **PISCANDO RÁPIDO** - Indica erro de comunicação
+- **LED Verde (GPIO 22)**: 🟢 **PISCANDO RÁPIDO** - Indica erro de comunicação
 
 ### **Modo Inválido**
 - **Todos os LEDs**: ⚫ **DESLIGADOS** - Sistema em estado de erro
@@ -100,8 +100,8 @@ Durante a transição entre estrela e triângulo:
 - **Corrente**: 20mA (com resistor limitador)
 - **Função**: Indicador dos Modos 1, 2 e 5
 
-### **LED Amarelo (GPIO 22)**
-- **Cor**: Amarelo
+### **LED Verde (GPIO 22)**
+- **Cor**: Verde
 - **Tensão de Operação**: 3.3V
 - **Corrente**: 20mA (com resistor limitador)
 - **Função**: Indicador dos Modos 3, 4 e 5
