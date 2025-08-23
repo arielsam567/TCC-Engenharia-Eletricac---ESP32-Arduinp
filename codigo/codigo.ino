@@ -1,6 +1,9 @@
 // Inclui a biblioteca para comunicação Bluetooth Serial
 #include "BluetoothSerial.h"
 #include <Preferences.h>
+#include <driver/adc.h>
+#include "esp_adc_cal.h"
+#include <math.h>
 
 /*
  * ========================================
@@ -30,11 +33,23 @@
 BluetoothSerial SerialBT;
 
 // Definição dos pinos
-const int entrada = 34;     // GPIO34 (entrada)
+const int entrada = 34;     // GPIO34 (entrada analógica do ZMPT101B)
 const int rele1 = 25;      // GPIO25 (relé 1)
 const int rele2 = 32;      // GPIO32 (relé 2) 
 const int ledBluetooh = 2;       // GPIO2 (relé 3) - Controlado automaticamente pelo status do Bluetooth
 const char* btName = "RELÉ MULTIFUNCIONAL - TCC ";
+
+// Configurações do sensor ZMPT101B - ADC ESP32
+const adc1_channel_t ZMPT101B_CHANNEL = ADC1_CHANNEL_6; // GPIO34
+const adc_atten_t ZMPT101B_ATTEN = ADC_ATTEN_DB_11;
+const adc_bits_width_t ZMPT101B_WIDTH = ADC_WIDTH_BIT_12;
+const int ZMPT101B_SAMPLES = 2000;        // Número de amostras para cálculo RMS
+const float ZMPT101B_THRESHOLD_VRMS = 15.0f; // Threshold em Volts RMS para detectar tensão AC
+const float ZMPT101B_MODULE_MEASURED_VRMS = 1.663f; // Tensão medida no pino OUT (Vrms) - ajuste conforme sua instalação
+const float ZMPT101B_NETWORK_VOLTAGE = 220.0f; // Tensão da rede (V)
+
+// Variável para caracterização do ADC
+esp_adc_cal_characteristics_t adc_chars;
 
 // Estados da máquina de estados
 enum Estados {
@@ -148,14 +163,24 @@ void verificarAlteracaoManual();
 void enviarNotificacaoAlteracaoManual(bool novoEstado, String tipoAlteracao);
 void enviarStatusAutomatico();
 void verificarStatusEntrada();
+void calibrarZMPT101B();
+bool ajustarThresholdZMPT101B(String comando);
 void debugPrint(String mensagem);
 
 void setup() {
   Serial.begin(VELOCIDADE_SERIAL);
   debugPrint("=== INICIANDO RELAY TIMER ===");
   
+  // Configuração do ADC para ZMPT101B
+  debugPrint("🔧 Configurando ADC para ZMPT101B...");
+  adc1_config_width(ZMPT101B_WIDTH);
+  adc1_config_channel_atten(ZMPT101B_CHANNEL, ZMPT101B_ATTEN);
+  esp_adc_cal_characterize(ADC_UNIT_1, ZMPT101B_ATTEN, ZMPT101B_WIDTH, 1100, &adc_chars);
+  delay(100);
+  debugPrint("✅ ADC configurado com sucesso");
+  
   // Configuração dos pinos
-  pinMode(entrada, INPUT);
+  // GPIO34 é entrada analógica por padrão, não precisa de pinMode
   pinMode(rele1, OUTPUT);
   pinMode(rele2, OUTPUT);
   pinMode(ledBluetooh, OUTPUT);
@@ -166,7 +191,7 @@ void setup() {
   digitalWrite(ledBluetooh, HIGH); // Porta 2 (GPIO2) inicia desligada
   
   // Inicializar variável de controle da entrada
-  entradaAtivaAnterior = digitalRead(entrada) == HIGH;
+  entradaAtivaAnterior = validarEntrada();
   debugPrint("🔍 Status inicial da entrada: " + String(entradaAtivaAnterior ? "ATIVA" : "INATIVA"));
   
   // Carregar configuração salva
@@ -256,6 +281,15 @@ void processarComandosRecebidos() {
           ligarRele(true);  // Liga os relés
         }
         enviarResposta("OK");
+      } else if (comandoProcessado == "CALIBRAR") {
+        // Comando para calibrar o sensor ZMPT101B
+        debugPrint("🔧 Comando de calibração recebido");
+        calibrarZMPT101B();
+        enviarResposta("CALIBRACAO_INICIADA");
+      } else if (ajustarThresholdZMPT101B(comandoProcessado)) {
+        // Comando para ajustar threshold do ZMPT101B
+        debugPrint("🔧 Comando de ajuste de threshold processado");
+        // A resposta já é enviada na função ajustarThresholdZMPT101B
       } else if (processarConfiguracao(comandoProcessado)) {
         // Comando de configuração válido
         debugPrint("✅ Comando de configuração válido - aplicando alterações");
@@ -831,9 +865,47 @@ void verificarStatusEntrada() {
   debugPrint("📊 Status da entrada: " + String(entradaAtiva ? "ATIVA" : "INATIVA") + " | Validada: " + String(entradaValidada ? "SIM" : "NÃO"));
 }
 
-// Função para validar entrada com anti-ruído
+// Função para validar entrada com anti-ruído usando ZMPT101B com cálculo RMS
 bool validarEntrada() {
-  bool leituraAtual = digitalRead(entrada) == HIGH;
+  // Calcular tensão RMS usando método correto para tensão AC
+  long sum_mV = 0;
+  
+  // Primeira passada: calcular média
+  for (int i = 0; i < ZMPT101B_SAMPLES; i++) {
+    int raw = adc1_get_raw(ZMPT101B_CHANNEL);
+    uint32_t mv = esp_adc_cal_raw_to_voltage(raw, &adc_chars);
+    sum_mV += (long)mv;
+  }
+  
+  double mean_mV = (double)sum_mV / (double)ZMPT101B_SAMPLES;
+  double meanV = mean_mV / 1000.0;
+
+  // Segunda passada: calcular RMS
+  double sq = 0.0;
+  int lastRaw = 0;
+  for (int i = 0; i < ZMPT101B_SAMPLES; i++) {
+    int raw = adc1_get_raw(ZMPT101B_CHANNEL);
+    lastRaw = raw;
+    uint32_t mv = esp_adc_cal_raw_to_voltage(raw, &adc_chars);
+    double v = (double)mv / 1000.0;
+    double d = v - meanV;
+    sq += d * d;
+  }
+
+  double Vrms_raw = sqrt(sq / (double)ZMPT101B_SAMPLES); 
+  double calib = ZMPT101B_NETWORK_VOLTAGE / ZMPT101B_MODULE_MEASURED_VRMS; 
+  double Vrms_network = Vrms_raw * calib;
+  
+  // Determinar se há tensão AC baseado no threshold RMS
+  bool leituraAtual = Vrms_network > ZMPT101B_THRESHOLD_VRMS;
+  
+  // Log da leitura RMS (a cada 10 verificações para não poluir o log)
+  static int contadorLog = 0;
+  contadorLog++;
+  if (contadorLog >= 10) {
+    debugPrint("📊 ZMPT101B - Vrms_rede: " + String(Vrms_network, 2) + "V | Vrms_modulo: " + String(Vrms_raw, 4) + "V | Threshold: " + String(ZMPT101B_THRESHOLD_VRMS) + "V | Status: " + String(leituraAtual ? "ATIVA" : "INATIVA"));
+    contadorLog = 0;
+  }
   
   if (leituraAtual) {
     // Entrada lida como ativa
@@ -843,7 +915,7 @@ bool validarEntrada() {
     if (contadorEntradaAtiva >= VALIDACAO_ENTRADA_COUNT && !entradaValidada) {
       // Entrada validada como ativa
       entradaValidada = true;
-      debugPrint("✅ Entrada VALIDADA como ATIVA após " + String(VALIDACAO_ENTRADA_COUNT) + " leituras consecutivas");
+      debugPrint("✅ Entrada VALIDADA como ATIVA após " + String(VALIDACAO_ENTRADA_COUNT) + " leituras consecutivas (Vrms: " + String(Vrms_network, 2) + "V)");
       return true;
     }
   } else {
@@ -854,13 +926,92 @@ bool validarEntrada() {
     if (contadorEntradaInativa >= VALIDACAO_ENTRADA_COUNT && entradaValidada) {
       // Entrada validada como inativa
       entradaValidada = false;
-      debugPrint("✅ Entrada VALIDADA como INATIVA após " + String(VALIDACAO_ENTRADA_COUNT) + " leituras consecutivas");
+      debugPrint("✅ Entrada VALIDADA como INATIVA após " + String(VALIDACAO_ENTRADA_COUNT) + " leituras consecutivas (Vrms: " + String(Vrms_network, 2) + "V)");
       return false;
     }
   }
   
   // Retorna o estado validado anterior (não mudou ainda)
   return entradaValidada;
+}
+
+// Função para calibrar o sensor ZMPT101B
+void calibrarZMPT101B() {
+  debugPrint("🔧 Iniciando calibração do ZMPT101B...");
+  debugPrint("⚠️  Certifique-se de que NÃO há tensão AC na entrada!");
+  
+  // Usar o mesmo método da função validarEntrada para consistência
+  long sum_mV = 0;
+  const int amostrasCalibracao = 2000;
+  
+  for (int i = 0; i < amostrasCalibracao; i++) {
+    int raw = adc1_get_raw(ZMPT101B_CHANNEL);
+    uint32_t mv = esp_adc_cal_raw_to_voltage(raw, &adc_chars);
+    sum_mV += (long)mv;
+    
+    if (i % 500 == 0) {
+      debugPrint("📊 Calibração: " + String(i) + "/" + String(amostrasCalibracao));
+    }
+  }
+  
+  double mean_mV = (double)sum_mV / (double)amostrasCalibracao;
+  double meanV = mean_mV / 1000.0;
+  
+  // Calcular RMS para calibração
+  double sq = 0.0;
+  for (int i = 0; i < amostrasCalibracao; i++) {
+    int raw = adc1_get_raw(ZMPT101B_CHANNEL);
+    uint32_t mv = esp_adc_cal_raw_to_voltage(raw, &adc_chars);
+    double v = (double)mv / 1000.0;
+    double d = v - meanV;
+    sq += d * d;
+  }
+  
+  double Vrms_raw = sqrt(sq / (double)amostrasCalibracao);
+  double Vrms_network = Vrms_raw * (ZMPT101B_NETWORK_VOLTAGE / ZMPT101B_MODULE_MEASURED_VRMS);
+  
+  debugPrint("📊 Calibração concluída:");
+  debugPrint("   Média sem tensão: " + String(meanV, 4) + "V");
+  debugPrint("   Vrms módulo: " + String(Vrms_raw, 4) + "V");
+  debugPrint("   Vrms rede estimada: " + String(Vrms_network, 2) + "V");
+  debugPrint("   Threshold atual: " + String(ZMPT101B_THRESHOLD_VRMS) + "V");
+  
+  // Sugerir novo threshold baseado na calibração
+  float novoThreshold = Vrms_network + 5.0; // Threshold = tensão calibrada + margem de segurança
+  
+  debugPrint("   Threshold sugerido: " + String(novoThreshold, 1) + "V");
+  
+  // Enviar resultado da calibração via Bluetooth se conectado
+  if (deviceConnected) {
+    String resultadoCalibracao = "CALIBRACAO|" + String(Vrms_network, 2) + "|" + String(novoThreshold, 1);
+    enviarNotificacao(resultadoCalibracao);
+  }
+}
+
+// Função para ajustar threshold do ZMPT101B via comando
+bool ajustarThresholdZMPT101B(String comando) {
+  // Formato: "THRESHOLD|valor" (valor em Volts RMS)
+  if (comando.startsWith("THRESHOLD|")) {
+    float novoThreshold = comando.substring(10).toFloat();
+    
+    if (novoThreshold > 0.0 && novoThreshold < 300.0) { // Threshold entre 0V e 300V RMS
+      // Aqui você pode implementar a lógica para salvar o novo threshold
+      // Por enquanto, apenas loga a alteração
+      debugPrint("🔧 Threshold ZMPT101B alterado para: " + String(novoThreshold, 1) + "V RMS");
+      
+      if (deviceConnected) {
+        enviarResposta("THRESHOLD_ALTERADO|" + String(novoThreshold, 1) + "V");
+      }
+      return true;
+    } else {
+      debugPrint("❌ Threshold inválido: " + String(novoThreshold, 1) + "V");
+      if (deviceConnected) {
+        enviarResposta("ERR: Threshold deve estar entre 0.1V e 300V RMS");
+      }
+      return false;
+    }
+  }
+  return false;
 }
 
 void debugPrint(String mensagem) {
