@@ -41,7 +41,8 @@ const int ledBluetooh = 2;       // GPIO2 (relé 3) - Controlado automaticamente
 // Definição dos pinos dos LEDs indicadores
 const int ledAzul = 23;     // GPIO23 - LED Azul (Modos 1, 2 e 5)
 const int ledAmarelo = 22;  // GPIO22 - LED Amarelo (Modos 3, 4 e 5)
-const int ledVermelho = 21; // GPIO21 - LED Vermelho (Indicador de tensão AC)
+const int ledVermelho = 19; // GPIO21 - LED Vermelho (Indicador de tensão AC)
+const int ledBranco = 18;   // GPIO18 - LED Branco (Indicador de contagem de tempo e operação cíclica)
 
 const char* btName = "RELÉ MULTIFUNCIONAL - TCC ";
 
@@ -108,6 +109,8 @@ const unsigned long TEMPO_TRANSICAO_ESTRELA_TRIANGULO = 150;
 
 // Configurações dos LEDs
 const unsigned long TEMPO_PISCA_LED = 500; // Tempo de piscada dos LEDs em milissegundos
+const unsigned long TEMPO_PISCA_LED_BRANCO_RAPIDO = 200; // Tempo de piscada rápida do LED branco (200ms)
+const unsigned long TEMPO_PISCA_LED_BRANCO_LENTO = 500;  // Tempo de piscada lenta do LED branco (500ms)
 
 // Controle de debug - altere para false para desativar todos os Serial.println
 const bool DEBUG_ENABLED = true;
@@ -156,6 +159,10 @@ bool temporizadorModo1Iniciado = false;
 unsigned long ultimoTempoPiscaLed = 0;
 bool estadoPiscaLed = false;
 
+// Variáveis para controle do LED branco
+unsigned long ultimoTempoPiscaLedBranco = 0;
+bool estadoPiscaLedBranco = false;
+
 Preferences preferences;
 
 // Declarações de funções (forward declarations)
@@ -181,6 +188,7 @@ bool ajustarThresholdZMPT101B(String comando);
 void debugPrint(String mensagem);
 void controlarLEDs();
 void configurarLEDs();
+void controlarLEDBranco();
 
 void setup() {
   Serial.begin(VELOCIDADE_SERIAL);
@@ -1055,13 +1063,15 @@ void configurarLEDs() {
   pinMode(ledAzul, OUTPUT);
   pinMode(ledAmarelo, OUTPUT);
   pinMode(ledVermelho, OUTPUT);
+  pinMode(ledBranco, OUTPUT);
   
   // Inicializar todos os LEDs desligados
   digitalWrite(ledAzul, LOW);
   digitalWrite(ledAmarelo, LOW);
   digitalWrite(ledVermelho, LOW);
+  digitalWrite(ledBranco, LOW);
   
-  debugPrint("🔧 LEDs configurados: Azul(GPIO23), Amarelo(GPIO22), Vermelho(GPIO21)");
+  debugPrint("🔧 LEDs configurados: Azul(GPIO23), Amarelo(GPIO22), Vermelho(GPIO21), Branco(GPIO18)");
 }
 
 // Função principal para controlar os LEDs baseado no modo atual
@@ -1112,6 +1122,76 @@ void controlarLEDs() {
       digitalWrite(ledAzul, LOW);
       digitalWrite(ledAmarelo, LOW);
       digitalWrite(ledVermelho, LOW);
+      digitalWrite(ledBranco, LOW);
+      break;
+  }
+  
+  // Controlar LED Branco baseado no modo atual
+  controlarLEDBranco();
+}
+
+// Função para controlar especificamente o LED branco
+void controlarLEDBranco() {
+  switch (estadoAtual) {
+    case MODO_1: // Retardo na energização
+      // LED Branco pisca apenas durante contagem de tempo para energizar (200ms)
+      if (temporizadorModo1Iniciado) {
+        if (millis() - ultimoTempoPiscaLedBranco >= TEMPO_PISCA_LED_BRANCO_RAPIDO) {
+          estadoPiscaLedBranco = !estadoPiscaLedBranco;
+          digitalWrite(ledBranco, estadoPiscaLedBranco ? HIGH : LOW);
+          ultimoTempoPiscaLedBranco = millis();
+        }
+      } else {
+        digitalWrite(ledBranco, LOW); // Desligado quando não está contando tempo
+      }
+      break;
+      
+    case MODO_2: // Retardo na desenergização
+      // LED Branco pisca apenas durante contagem de tempo para desenergizar (200ms)
+      if (relesLigados && (millis() - tempoInicio) < (config.tempo1 * 1000)) {
+        if (millis() - ultimoTempoPiscaLedBranco >= TEMPO_PISCA_LED_BRANCO_RAPIDO) {
+          estadoPiscaLedBranco = !estadoPiscaLedBranco;
+          digitalWrite(ledBranco, estadoPiscaLedBranco ? HIGH : LOW);
+          ultimoTempoPiscaLedBranco = millis();
+        }
+      } else {
+        digitalWrite(ledBranco, LOW); // Desligado quando não está contando tempo
+      }
+      break;
+      
+    case MODO_3: // Cíclico com início ligado
+      // LED Branco pisca continuamente durante operação cíclica (500ms)
+      if (millis() - ultimoTempoPiscaLedBranco >= TEMPO_PISCA_LED_BRANCO_LENTO) {
+        estadoPiscaLedBranco = !estadoPiscaLedBranco;
+        digitalWrite(ledBranco, estadoPiscaLedBranco ? HIGH : LOW);
+        ultimoTempoPiscaLedBranco = millis();
+      }
+      break;
+      
+    case MODO_4: // Cíclico com início desligado
+      // LED Branco pisca continuamente durante operação cíclica (500ms)
+      if (millis() - ultimoTempoPiscaLedBranco >= TEMPO_PISCA_LED_BRANCO_LENTO) {
+        estadoPiscaLedBranco = !estadoPiscaLedBranco;
+        digitalWrite(ledBranco, estadoPiscaLedBranco ? HIGH : LOW);
+        ultimoTempoPiscaLedBranco = millis();
+      }
+      break;
+      
+    case MODO_5: // Partida estrela-triângulo
+      // LED Branco pisca apenas durante contagem de tempo estrela-triângulo (200ms)
+      if (transicaoEstrelaTrianguloEmAndamento) {
+        if (millis() - ultimoTempoPiscaLedBranco >= TEMPO_PISCA_LED_BRANCO_RAPIDO) {
+          estadoPiscaLedBranco = !estadoPiscaLedBranco;
+          digitalWrite(ledBranco, estadoPiscaLedBranco ? HIGH : LOW);
+          ultimoTempoPiscaLedBranco = millis();
+        }
+      } else {
+        digitalWrite(ledBranco, LOW); // Desligado quando não está em transição
+      }
+      break;
+      
+    default:
+      digitalWrite(ledBranco, LOW); // Desligado para modo inválido
       break;
   }
 }

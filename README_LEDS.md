@@ -9,7 +9,7 @@ Este documento descreve o comportamento dos LEDs indicadores do sistema de contr
 |-------|------------|---------|
 | **GPIO 23** | 🔵 **Azul** | Indicador do Modo 1 e 2 |
 | **GPIO 22** | 🟡 **Amarelo** | Indicador do Modo 3 e 4 |
-| **GPIO 21** | 🔴 **Vermelho** | Indicador de leitura da porta 34 (sensor ZMPT101B) |
+| **GPIO 19** | 🔴 **Vermelho** | Indicador de leitura da porta 34 (sensor ZMPT101B) |
 | **GPIO 18** | ⚪ **Branco** | Indicador de contagem de tempo e operação cíclica |
 | **GPIO 2** | 🔵 **Azul** | Indicador de status da conexão Bluetooth |
 
@@ -58,7 +58,7 @@ Este documento descreve o comportamento dos LEDs indicadores do sistema de contr
 
 ## 🔴 LED Vermelho - Indicador de Tensão AC
 
-### **Funcionamento do LED Vermelho (GPIO 21)**
+### **Funcionamento do LED Vermelho (GPIO 19)**
 - **Cor**: 🔴 **Vermelho**
 - **Função**: Indicador de presença de tensão AC na porta 34 (sensor ZMPT101B)
 - **Comportamento**:
@@ -106,7 +106,7 @@ Durante a transição entre estrela e triângulo:
 - **Corrente**: 20mA (com resistor limitador)
 - **Função**: Indicador dos Modos 3, 4 e 5
 
-### **LED Vermelho (GPIO 21)**
+### **LED Vermelho (GPIO 19)**
 - **Cor**: Vermelho
 - **Tensão de Operação**: 3.3V
 - **Corrente**: 20mA (com resistor limitador)
