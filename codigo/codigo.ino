@@ -37,6 +37,12 @@ const int entrada = 34;     // GPIO34 (entrada analógica do ZMPT101B)
 const int rele1 = 25;      // GPIO25 (relé 1)
 const int rele2 = 32;      // GPIO32 (relé 2) 
 const int ledBluetooh = 2;       // GPIO2 (relé 3) - Controlado automaticamente pelo status do Bluetooth
+
+// Definição dos pinos dos LEDs indicadores
+const int ledAzul = 23;     // GPIO23 - LED Azul (Modos 1, 2 e 5)
+const int ledAmarelo = 22;  // GPIO22 - LED Amarelo (Modos 3, 4 e 5)
+const int ledVermelho = 21; // GPIO21 - LED Vermelho (Indicador de tensão AC)
+
 const char* btName = "RELÉ MULTIFUNCIONAL - TCC ";
 
 // Configurações do sensor ZMPT101B - ADC ESP32
@@ -100,6 +106,9 @@ const unsigned long VALOR_INICIAL = 0; // Valor inicial para variáveis de tempo
 // Tempo de transição estrela-triângulo (em milissegundos)
 const unsigned long TEMPO_TRANSICAO_ESTRELA_TRIANGULO = 150;
 
+// Configurações dos LEDs
+const unsigned long TEMPO_PISCA_LED = 500; // Tempo de piscada dos LEDs em milissegundos
+
 // Controle de debug - altere para false para desativar todos os Serial.println
 const bool DEBUG_ENABLED = true;
 
@@ -143,6 +152,10 @@ bool statusEnviado = false;
 // Variáveis para controle de tempo no modo 1
 bool temporizadorModo1Iniciado = false;
 
+// Variáveis para controle dos LEDs
+unsigned long ultimoTempoPiscaLed = 0;
+bool estadoPiscaLed = false;
+
 Preferences preferences;
 
 // Declarações de funções (forward declarations)
@@ -166,6 +179,8 @@ void verificarStatusEntrada();
 void calibrarZMPT101B();
 bool ajustarThresholdZMPT101B(String comando);
 void debugPrint(String mensagem);
+void controlarLEDs();
+void configurarLEDs();
 
 void setup() {
   Serial.begin(VELOCIDADE_SERIAL);
@@ -184,6 +199,9 @@ void setup() {
   pinMode(rele1, OUTPUT);
   pinMode(rele2, OUTPUT);
   pinMode(ledBluetooh, OUTPUT);
+  
+  // Configuração dos LEDs indicadores
+  configurarLEDs();
   
   // Inicializar relés desligados
   digitalWrite(rele1, HIGH);
@@ -217,6 +235,9 @@ void loop() {
   
   // Executar máquina de estados
   executarMaquinaEstados();
+  
+  // Controlar LEDs indicadores
+  controlarLEDs();
   
   // delay(DELAY_LOOP); // pausa para estabilidade
 }
@@ -1017,5 +1038,75 @@ bool ajustarThresholdZMPT101B(String comando) {
 void debugPrint(String mensagem) {
   if (DEBUG_ENABLED) {
     Serial.println(mensagem);
+  }
+}
+
+// ========================================
+// FUNÇÕES DE CONTROLE DOS LEDs
+// ========================================
+
+// Função para configurar os pinos dos LEDs
+void configurarLEDs() {
+  pinMode(ledAzul, OUTPUT);
+  pinMode(ledAmarelo, OUTPUT);
+  pinMode(ledVermelho, OUTPUT);
+  
+  // Inicializar todos os LEDs desligados
+  digitalWrite(ledAzul, LOW);
+  digitalWrite(ledAmarelo, LOW);
+  digitalWrite(ledVermelho, LOW);
+  
+  debugPrint("🔧 LEDs configurados: Azul(GPIO23), Amarelo(GPIO22), Vermelho(GPIO21)");
+}
+
+// Função principal para controlar os LEDs baseado no modo atual
+void controlarLEDs() {
+  // Controlar LED Vermelho (indicador de tensão AC)
+  bool tensaoAC = validarEntrada();
+  digitalWrite(ledVermelho, tensaoAC ? HIGH : LOW);
+  
+  // Controlar LEDs Azul e Amarelo baseado no modo atual
+  switch (estadoAtual) {
+    case MODO_1: // Retardo na energização
+      digitalWrite(ledAzul, HIGH);      // LED Azul sempre aceso
+      digitalWrite(ledAmarelo, LOW);    // LED Amarelo sempre desligado
+      break;
+      
+    case MODO_2: // Retardo na desenergização
+      // LED Azul piscando
+      if (millis() - ultimoTempoPiscaLed >= TEMPO_PISCA_LED) {
+        estadoPiscaLed = !estadoPiscaLed;
+        digitalWrite(ledAzul, estadoPiscaLed ? HIGH : LOW);
+        ultimoTempoPiscaLed = millis();
+      }
+      digitalWrite(ledAmarelo, LOW);    // LED Amarelo sempre desligado
+      break;
+      
+    case MODO_3: // Cíclico com início ligado
+      digitalWrite(ledAzul, LOW);       // LED Azul sempre desligado
+      digitalWrite(ledAmarelo, HIGH);   // LED Amarelo sempre aceso
+      break;
+      
+    case MODO_4: // Cíclico com início desligado
+      digitalWrite(ledAzul, LOW);       // LED Azul sempre desligado
+      // LED Amarelo piscando
+      if (millis() - ultimoTempoPiscaLed >= TEMPO_PISCA_LED) {
+        estadoPiscaLed = !estadoPiscaLed;
+        digitalWrite(ledAmarelo, estadoPiscaLed ? HIGH : LOW);
+        ultimoTempoPiscaLed = millis();
+      }
+      break;
+      
+    case MODO_5: // Partida estrela-triângulo
+      digitalWrite(ledAzul, HIGH);      // LED Azul sempre aceso
+      digitalWrite(ledAmarelo, HIGH);   // LED Amarelo sempre aceso
+      break;
+      
+    default:
+      // Modo inválido - todos os LEDs desligados
+      digitalWrite(ledAzul, LOW);
+      digitalWrite(ledAmarelo, LOW);
+      digitalWrite(ledVermelho, LOW);
+      break;
   }
 }
