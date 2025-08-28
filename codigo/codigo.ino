@@ -1193,15 +1193,16 @@ void controlarLEDBranco() {
       break;
       
     case MODO_5: // Partida estrela-triângulo
-      // LED Branco pisca apenas durante contagem de tempo estrela-triângulo (200ms)
-      if (transicaoEstrelaTrianguloEmAndamento) {
+      // LED Branco pisca apenas durante contagem de tempo estrela (200ms), no modo triângulo não deve piscar
+      if (modoEstrela && tempoAtual < config.tempo1) {
+        // Piscar apenas quando estiver no modo estrela e contando tempo para transição
         if (millis() - ultimoTempoPiscaLedBranco >= TEMPO_PISCA_LED_BRANCO_RAPIDO) {
           estadoPiscaLedBranco = !estadoPiscaLedBranco;
           digitalWrite(ledBranco, estadoPiscaLedBranco ? HIGH : LOW);
           ultimoTempoPiscaLedBranco = millis();
         }
       } else {
-        digitalWrite(ledBranco, LOW); // Desligado quando não está em transição
+        digitalWrite(ledBranco, LOW); // Desligado quando não está contando tempo estrela
       }
       break;
       
