@@ -1167,20 +1167,28 @@ void controlarLEDBranco() {
       break;
       
     case MODO_3: // Cíclico com início ligado
-      // LED Branco pisca continuamente durante operação cíclica (500ms)
-      if (millis() - ultimoTempoPiscaLedBranco >= TEMPO_PISCA_LED_BRANCO_LENTO) {
-        estadoPiscaLedBranco = !estadoPiscaLedBranco;
-        digitalWrite(ledBranco, estadoPiscaLedBranco ? HIGH : LOW);
-        ultimoTempoPiscaLedBranco = millis();
+      // LED Branco pisca continuamente durante operação cíclica (500ms), apenas quando sensor estiver ativo
+      if (validarEntrada()) { // Apenas quando entrada estiver ativa
+        if (millis() - ultimoTempoPiscaLedBranco >= TEMPO_PISCA_LED_BRANCO_LENTO) {
+          estadoPiscaLedBranco = !estadoPiscaLedBranco;
+          digitalWrite(ledBranco, estadoPiscaLedBranco ? HIGH : LOW);
+          ultimoTempoPiscaLedBranco = millis();
+        }
+      } else {
+        digitalWrite(ledBranco, LOW); // Desligado quando sensor inativo
       }
       break;
       
     case MODO_4: // Cíclico com início desligado
-      // LED Branco pisca continuamente durante operação cíclica (500ms)
-      if (millis() - ultimoTempoPiscaLedBranco >= TEMPO_PISCA_LED_BRANCO_LENTO) {
-        estadoPiscaLedBranco = !estadoPiscaLedBranco;
-        digitalWrite(ledBranco, estadoPiscaLedBranco ? HIGH : LOW);
-        ultimoTempoPiscaLedBranco = millis();
+      // LED Branco pisca continuamente durante operação cíclica (500ms), apenas quando sensor estiver ativo
+      if (validarEntrada()) { // Apenas quando entrada estiver ativa
+        if (millis() - ultimoTempoPiscaLedBranco >= TEMPO_PISCA_LED_BRANCO_LENTO) {
+          estadoPiscaLedBranco = !estadoPiscaLedBranco;
+          digitalWrite(ledBranco, estadoPiscaLedBranco ? HIGH : LOW);
+          ultimoTempoPiscaLedBranco = millis();
+        }
+      } else {
+        digitalWrite(ledBranco, LOW); // Desligado quando sensor inativo
       }
       break;
       
