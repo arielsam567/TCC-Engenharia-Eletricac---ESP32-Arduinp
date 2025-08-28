@@ -66,8 +66,8 @@ Cada modo é configurado através de dois parâmetros de tempo:
 ### Funcionamento:
 1. **Entrada acionada (GPIO34 = HIGH):**
    - Relés iniciam **DESLIGADOS**
-   - Após **Y segundos** (T2), liga os relés
-   - Após **X segundos** (T1), desliga os relés novamente
+   - Após **Y segundos** (T1), liga os relés
+   - Após **Y segundos** (T1), desliga os relés novamente
    - Ciclo continua infinitamente
 
 2. **Entrada desacionada (GPIO34 = LOW):**

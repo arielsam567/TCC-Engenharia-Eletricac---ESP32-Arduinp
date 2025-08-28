@@ -211,10 +211,14 @@ void setup() {
   // Configuração dos LEDs indicadores
   configurarLEDs();
   
-  // Inicializar relés desligados
+  // Inicializar relés desligados (HIGH = desligado para relés de nível baixo)
   digitalWrite(rele1, HIGH);
   digitalWrite(rele2, HIGH);
   digitalWrite(ledBluetooh, LOW); // LED Bluetooth inicia desligado (sem conexão)
+  
+  // Garantir que a variável de estado esteja consistente com o estado físico
+  relesLigados = false;
+  debugPrint("🔌 Relés inicializados DESLIGADOS (GPIO25 e GPIO32 = HIGH)");
   
   // Inicializar variável de controle da entrada
   entradaAtivaAnterior = validarEntrada();
@@ -546,8 +550,16 @@ void iniciarModo() {
   }
   
   // Aplicar estado inicial baseado no modo (apenas quando entrada ativa)
-  ligarRele(relesLigados);
-  debugPrint("🟢 Entrada ativa - aplicando estado inicial do modo " + String(config.modo));
+  // MODO 4 não aplica estado inicial - deixa a máquina de estados controlar o ciclo
+  if (estadoAtual != MODO_4) {
+    ligarRele(relesLigados);
+    debugPrint("🟢 Entrada ativa - aplicando estado inicial do modo " + String(config.modo));
+  } else {
+    // MODO 4: Garantir que o temporizador esteja zerado para iniciar o ciclo corretamente
+    tempoInicio = millis();
+    tempoAtual = 0;
+    debugPrint("🟢 Entrada ativa - MODO 4: temporizador zerado, aguardando " + String(config.tempo1) + "s para iniciar ciclo");
+  }
 }
 
 void executarMaquinaEstados() {
@@ -565,6 +577,12 @@ void executarMaquinaEstados() {
       temporizadorModo1Iniciado = false;
       tempoInicio = millis();
       tempoAtual = 0;
+    } else if (estadoAtual == MODO_4) {
+      // MODO 4: Resetar temporizador quando entrada mudar para ativa
+      // Isso garante que o ciclo comece do zero
+      tempoInicio = millis();
+      tempoAtual = 0;
+      debugPrint("⏰ MODO 4: Entrada ativada - resetando temporizador para iniciar ciclo");
     }
   }
   
@@ -680,7 +698,10 @@ void executarMaquinaEstados() {
           tempoAtual = 0;
         }
       } else if (entradaAtiva) {
-        // Entrada acionada - controlar ciclo
+        // Entrada acionada - controlar ciclo cíclico
+        // IMPORTANTE: MODO 4 inicia sempre DESLIGADO e aguarda T1 segundos antes de ligar
+        debugPrint("⏰ MODO 4: Entrada ativa - Tempo atual: " + String(tempoAtual) + "s, Aguardando: " + String(config.tempo1) + "s");
+        
         if (!relesLigados && tempoAtual >= config.tempo1) {
           // Tempo T1 atingido - ligar relés e iniciar contagem para desligar
           debugPrint("🔄 MODO 4: Ligando relés após " + String(config.tempo1) + "s");
