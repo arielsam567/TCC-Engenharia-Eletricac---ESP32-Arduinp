@@ -31,19 +31,19 @@ Este documento descreve o comportamento dos LEDs indicadores do sistema de contr
 ### **Modo 3 - Cíclico com Início Ligado**
 - **LED Azul (GPIO 23)**: ⚫ **DESLIGADO** - Modo não utilizado
 - **LED Verde (GPIO 22)**: 🟢 **ACESO** - Indica modo ativo
-- **LED Branco (GPIO 18)**: ⚪ **PISCANDO** - Pisca continuamente durante operação cíclica (500ms)
+- **LED Branco (GPIO 18)**: ⚪ **PISCANDO** - Pisca continuamente durante operação cíclica (500ms), apenas qnd o sensor estiver on
 - **Descrição**: Sistema opera em ciclo contínuo, iniciando na posição ligada
 
 ### **Modo 4 - Cíclico com Início Desligado**
 - **LED Azul (GPIO 23)**: ⚫ **DESLIGADO** - Modo não utilizado
 - **LED Verde (GPIO 22)**: 🟢 **PISCANDO** - Indica modo ativo com operação cíclica
-- **LED Branco (GPIO 18)**: ⚪ **PISCANDO** - Pisca continuamente durante operação cíclica (500ms)
+- **LED Branco (GPIO 18)**: ⚪ **PISCANDO** - Pisca continuamente durante operação cíclica (500ms), apenas qnd o sensor estiver on
 - **Descrição**: Sistema opera em ciclo contínuo, iniciando na posição desligada
 
 ### **Modo 5 - Partida Estrela-Triângulo**
 - **LED Azul (GPIO 23)**: 🔵 **ACESO** - Indica modo ativo
 - **LED Verde (GPIO 22)**: 🟢 **ACESO** - Indica modo ativo
-- **LED Branco (GPIO 18)**: ⚪ **PISCANDO** - Pisca apenas durante contagem de tempo estrela-triângulo (200ms)
+- **LED Branco (GPIO 18)**: ⚪ **PISCANDO** - Pisca apenas durante contagem de tempo estrela (200ms), no modo triângulo nao deve piscar
 - **Descrição**: Ambos os LEDs ficam acesos durante a operação estrela-triângulo
 
 ## 🔵 LED Bluetooth - Indicador de Status da Conexão
@@ -118,9 +118,7 @@ Durante a transição entre estrela e triângulo:
 - **Tensão de Operação**: 3.3V
 - **Corrente**: 20mA (com resistor limitador)
 - **Função**: Indicador de contagem de tempo e operação cíclica
-- **Comportamento**: 
-  - **Modos 1, 2 e 5**: Pisca a cada 200ms durante contagem de tempo
-  - **Modos 3 e 4**: Pisca a cada 500ms continuamente
+
 
 
 
@@ -162,6 +160,4 @@ Durante a transição entre estrela e triângulo:
 
 ---
 
-**Última Atualização**: Dezembro 2024  
-**Versão**: 1.0  
 **Autor**: Sistema de Controle de Relés - TCC Engenharia Elétrica

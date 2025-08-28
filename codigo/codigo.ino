@@ -452,6 +452,7 @@ void restaurarEstadoSalvo() {
     switch (estadoAtual) {
       case MODO_1: // Retardo na energização - inicia desligado
         relesLigados = false;
+        temporizadorModo1Iniciado = false; // Inicializar temporizador como false
         debugPrint("📋 MODO 1 configurado - relés iniciam DESLIGADOS");
         break;
       case MODO_2: // Retardo na desenergização - inicia ligado
@@ -502,6 +503,7 @@ void iniciarModo() {
     case MODO_1: // Retardo na energização - inicia desligado
       relesLigados = false;
       modoEstrela = true;
+      temporizadorModo1Iniciado = false; // Inicializar temporizador como false
       debugPrint("📋 MODO 1 selecionado - relés iniciam DESLIGADOS");
       break;
     case MODO_2: // Retardo na desenergização - inicia ligado
@@ -599,9 +601,11 @@ void executarMaquinaEstados() {
       debugPrint("⏰ MODO 1: Entrada acionada - iniciando temporizador de " + String(config.tempo1) + "s (segundo " + String(timestamp) + ")");
         } else if (tempoAtual >= config.tempo1) {
           // Tempo atingido - ligar relés
-                      unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS;
-            debugPrint("✅ MODO 1 CONCLUÍDO - Relés ligados após " + String(config.tempo1) + "s (segundo " + String(timestamp) + ")");
+          unsigned long timestamp = millis() / CONVERSOR_SEGUNDOS;
+          debugPrint("✅ MODO 1 CONCLUÍDO - Relés ligados após " + String(config.tempo1) + "s (segundo " + String(timestamp) + ")");
           ligarRele(true);
+          // Resetar temporizador para parar o LED branco de piscar
+          temporizadorModo1Iniciado = false;
         }
       }
       break;
@@ -619,6 +623,8 @@ void executarMaquinaEstados() {
           // Tempo de retardo atingido - desligar relés
           debugPrint("✅ MODO 2 CONCLUÍDO - Relés desligados após " + String(config.tempo1) + "s");
           ligarRele(false);
+          // Resetar flag para parar o LED branco de piscar
+          modoEstrela = false;
           estadoAtual = MODO_2; // Permanecer no MODO_2
         }
       } else if (entradaAtiva) {
@@ -1148,7 +1154,8 @@ void controlarLEDBranco() {
       
     case MODO_2: // Retardo na desenergização
       // LED Branco pisca apenas durante contagem de tempo para desenergizar (200ms)
-      if (relesLigados && (millis() - tempoInicio) < (config.tempo1 * 1000)) {
+      if (relesLigados && modoEstrela && tempoAtual < config.tempo1) {
+        // Piscar apenas quando estiver contando tempo para desligar (modoEstrela = true indica temporizador ativo)
         if (millis() - ultimoTempoPiscaLedBranco >= TEMPO_PISCA_LED_BRANCO_RAPIDO) {
           estadoPiscaLedBranco = !estadoPiscaLedBranco;
           digitalWrite(ledBranco, estadoPiscaLedBranco ? HIGH : LOW);
